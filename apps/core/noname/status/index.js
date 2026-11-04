@@ -83,10 +83,6 @@ export class status {
 	 */
 	video = undefined;
 	/**
-	 * @type { Function | boolean | undefined }
-	 */
-	new_tutorial = undefined;
-	/**
 	 * @type { Player | undefined }
 	 */
 	roundStart = undefined;

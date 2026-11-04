@@ -5,11 +5,14 @@
     "scripts": {
         "dev": "tsx scripts/dev.ts",
         "build": "tsx scripts/build.ts",
-        "init:extension": "tsx scripts/initExtension.ts",
         "serve": "pnpm -F @noname/fs dev --dirname=../../dist",
         "start": "pnpm build && pnpm serve",
-        "generateTestPack": "pnpm build && tsx scripts/generateTestPack.ts",
-        "lint": "pnpm -r lint"
+        "package": "pnpm build && tsx scripts/package.ts",
+        "lint": "pnpm -r lint",
+        "test": "node --import tsx --test scripts/*.test.js apps/core/scripts/*.test.js",
+        "check:types": "node scripts/check-types.js",
+        "test:browser": "node scripts/run-browser-smoke.js",
+        "audit:assets": "node scripts/audit-assets.js"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",
@@ -28,5 +31,9 @@
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.55.0",
         "vue-eslint-parser": "^10.3.0"
+    },
+    "engines": {
+        "node": ">=24 <25",
+        "pnpm": ">=10 <12"
     }
 }

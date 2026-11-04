@@ -314,7 +314,7 @@ export const startMenu = function (connectMenu) {
 							this.firstChild.innerHTML = "此模式将在重启后隐藏";
 							lib.config.hiddenModePack.add(mode);
 							if (!lib.config.prompt_hidepack) {
-								alert("隐藏的扩展包可通过选项-其它-重置隐藏内容恢复");
+								alert("隐藏的内容包可通过选项-其它-重置隐藏内容恢复");
 								game.saveConfig("prompt_hidepack", true);
 							}
 						} else {

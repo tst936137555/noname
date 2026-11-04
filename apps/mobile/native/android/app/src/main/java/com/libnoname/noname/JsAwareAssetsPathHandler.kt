@@ -16,15 +16,7 @@ class JsAwarePathHandler(
     override fun handle(path: String): WebResourceResponse? {
         return try {
             val normalized = store.normalize(path)
-            val safFile = store.findSaf(normalized, pnpmCompat = true)
-
-            if (safFile != null && safFile.isFile) {
-                val stream = store.openSafInput(safFile)
-                if (stream != null) {
-                    return WebResourceResponse(guessMime(normalized), "UTF-8", stream)
-                }
-            }
-
+            // Game code and resources always come from this installation.
             val assetPath = store.assetPath(normalized, basePath)
             val stream = context.assets.open(assetPath)
             val mime = guessMime(assetPath)

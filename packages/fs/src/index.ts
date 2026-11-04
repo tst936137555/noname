@@ -28,34 +28,45 @@ export const defaultConfig = {
 	server: false,
 	port: 8089,
 	debug: false,
+	listen: true,
 	dirname: cwd(),
 };
 
 function createFsHandler(dirname: string) {
-	const join = (url: string) => path.join(dirname, url);
-	// 比较前给 dirname 补上路径分隔符，否则同级的 `${dirname}-backup` 之类目录会被当成项目内路径
-	const prefix = dirname.endsWith(path.sep) ? dirname : dirname + path.sep;
-	const isInProject = (url: string) => {
-		const full = path.resolve(join(url));
-		return full === dirname || full.startsWith(prefix);
+	const inside = (root: string, target: string) => {
+		const relative = path.relative(root, target);
+		return !relative || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(".." + path.sep));
 	};
-
-	const ensureSafe = (url: string) => {
-		if (!isInProject(url)) throw new Error(`只能访问 ${dirname} 下的资源`);
-		return join(url);
-	};
-
-	const wrap = <Q, R>(fn: (query: Q) => Promise<R>) => {
-		return async (req: any) => {
+	const ensureSafe = async (url: string) => {
+		if (typeof url !== "string" || url.includes("\0") || path.isAbsolute(url)) throw new Error("Invalid path");
+		const full = path.resolve(dirname, url);
+		if (!inside(dirname, full) || url.split(/[\\/]/).some(part => part.toLowerCase() === "home" || part.toLowerCase() === ".git")) throw new Error("Access denied");
+		const root = await fs.realpath(dirname);
+		let ancestor = full;
+		while (true) {
 			try {
-				return successfulJson(await fn(req.method == "POST" ? req.body : req.query));
+				if (!inside(root, await fs.realpath(ancestor))) throw new Error("Access denied");
+				break;
+			} catch (error: any) {
+				if (error.code !== "ENOENT") throw error;
+				const parent = path.dirname(ancestor);
+				if (parent === ancestor) throw error;
+				ancestor = parent;
+			}
+		}
+		return full;
+	};
+	const wrap =
+		<Q, R>(fn: (query: Q) => Promise<R>) =>
+		async (req: any, reply: any) => {
+			try {
+				return successfulJson(await fn(req.method === "POST" ? req.body : req.query));
 			} catch (e: any) {
+				reply.code(400);
 				return failedJson(400, String(e));
 			}
 		};
-	};
-
-	return { join, ensureSafe, wrap };
+	return { ensureSafe, wrap };
 }
 
 export default function createApp(config: Partial<typeof defaultConfig> = {}) {
@@ -69,7 +80,7 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 	const { ensureSafe, wrap } = createFsHandler(cfg.dirname);
 
 	app.register(cors, {
-		origin: "*",
+		origin: false,
 		methods: ["GET", "POST", "OPTIONS"],
 	});
 
@@ -77,6 +88,7 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 		root: cfg.dirname,
 		prefix: "/",
 		dotfiles: "allow",
+		allowedPath: (_path, _root, request) => !request.url.split(/[/?]/).some(part => ["home", ".git"].includes(decodeURIComponent(part).toLowerCase())),
 		maxAge: 0,
 	});
 
@@ -84,29 +96,9 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 	app.get("/", async (req, reply) => reply.redirect("/index.html"));
 
 	app.get(
-		"/createDir",
-		wrap(async ({ dir }: { dir: string }) => {
-			const full = ensureSafe(dir);
-			await fs.mkdir(full, { recursive: true });
-			return true;
-		})
-	);
-
-	app.get(
-		"/removeDir",
-		wrap(async ({ dir }: { dir: string }) => {
-			const full = ensureSafe(dir);
-			const stat = await fs.stat(full);
-			if (!stat.isDirectory()) throw new Error(`${full} 不是文件夹`);
-			await fs.rm(full, { recursive: true, force: true });
-			return true;
-		})
-	);
-
-	app.get(
 		"/readFile",
 		wrap(async ({ fileName }: { fileName: string }) => {
-			const full = ensureSafe(fileName);
+			const full = await ensureSafe(fileName);
 			const data = await fs.readFile(full);
 			return [...new Uint8Array(data)];
 		})
@@ -115,39 +107,15 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 	app.get(
 		"/readFileAsText",
 		wrap(async ({ fileName }: { fileName: string }) => {
-			const full = ensureSafe(fileName);
+			const full = await ensureSafe(fileName);
 			return await fs.readFile(full, "utf-8");
-		})
-	);
-
-	app.post(
-		"/writeFile",
-		{
-			bodyLimit: 10 * 1024 * 1024 * 1024,
-		},
-		wrap(async ({ path: p, data }: { path: string; data: number[] }) => {
-			const full = ensureSafe(p);
-			await fs.mkdir(path.dirname(full), { recursive: true });
-			await fs.writeFile(full, Buffer.from(data));
-			return true;
-		})
-	);
-
-	app.get(
-		"/removeFile",
-		wrap(async ({ fileName }: { fileName: string }) => {
-			const full = ensureSafe(fileName);
-			const stat = await fs.stat(full);
-			if (stat.isDirectory()) throw new Error("不能删除文件夹");
-			await fs.unlink(full);
-			return true;
 		})
 	);
 
 	app.get(
 		"/getFileList",
 		wrap(async ({ dir }: { dir: string }) => {
-			const full = ensureSafe(dir);
+			const full = await ensureSafe(dir);
 			const stat = await fs.stat(full);
 			if (stat.isFile()) throw new Error("路径不是文件夹");
 
@@ -170,7 +138,7 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 	app.get(
 		"/checkFile",
 		wrap(async ({ fileName }: { fileName: string }) => {
-			const full = ensureSafe(fileName);
+			const full = await ensureSafe(fileName);
 			try {
 				const stat = await fs.stat(full);
 				if (stat.isFile()) return "file";
@@ -184,7 +152,7 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 	app.get(
 		"/checkDir",
 		wrap(async ({ dir }: { dir: string }) => {
-			const full = ensureSafe(dir);
+			const full = await ensureSafe(dir);
 			try {
 				const stat = await fs.stat(full);
 				if (stat.isFile()) return "file";
@@ -203,25 +171,28 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 		reply.send(failedJson(400, String(err)));
 	});
 
-	const callback = () => {
-		console.log(`Server listening on port ${cfg.port}`);
-		if (!cfg.server && !cfg.debug) exec(`start http://localhost:${cfg.port}/`);
-	};
-
-	// if (config.https) {
-	// 	const SSLOptions = {
-	// 		key: fs.readFileSync(path.join(config.dirname, "localhost.decrypted.key")),
-	// 		cert: fs.readFileSync(path.join(config.dirname, "localhost.crt")),
-	// 	};
-	// 	const httpsServer = https.createServer(SSLOptions, app);
-	// 	// 会提示NET::ERR_CERT_AUTHORITY_INVALID
-	// 	// 但浏览器还是可以访问的
-	// 	// todo: 解决sw注册问题
-	// 	httpsServer.listen(config.port, callback);
-	// } else {
-	// 	app.listen(config.port, callback);
-	// }
-	app.listen({ port: cfg.port }, callback);
-
+	app.addHook("onRequest", async (req, reply) => {
+		const origin = req.headers.origin;
+		const expected = `http://${req.headers.host}`;
+		if (origin && origin !== expected) return reply.code(403).send(failedJson(403, "Origin denied"));
+		if (req.headers["sec-fetch-site"] === "cross-site") return reply.code(403).send(failedJson(403, "Origin denied"));
+		if (!["localhost", "127.0.0.1", "[::1]"].includes((req.headers.host || "").replace(/:\d+$/, ""))) return reply.code(403).send(failedJson(403, "Host denied"));
+		// Validate static requests as well as API paths, including junctions.
+		try {
+			await ensureSafe(decodeURIComponent(req.url.split("?")[0]).replace(/^\//, ""));
+		} catch {
+			return reply.code(403).send(failedJson(403, "Path denied"));
+		}
+	});
+	if (cfg.listen)
+		app.listen({ port: cfg.port, host: "127.0.0.1" }, (error, address) => {
+			if (error) {
+				console.error(error);
+				process.exitCode = 1;
+				return;
+			}
+			console.log(`Server listening at ${address}`);
+			if (!cfg.server && !cfg.debug && process.platform === "win32") exec(`start ${address}/`);
+		});
 	return app;
 }

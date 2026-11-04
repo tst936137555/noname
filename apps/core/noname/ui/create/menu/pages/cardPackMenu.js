@@ -308,7 +308,7 @@ export const cardPackMenu = function (connectMenu) {
 						this.firstChild.innerHTML = "卡牌包将在重启后隐藏";
 						lib.config.hiddenCardPack.add(mode);
 						if (!lib.config.prompt_hidepack) {
-							alert("隐藏的扩展包可通过选项-其它-重置隐藏内容恢复");
+							alert("隐藏的内容包可通过选项-其它-重置隐藏内容恢复");
 							game.saveConfig("prompt_hidepack", true);
 						}
 					} else {

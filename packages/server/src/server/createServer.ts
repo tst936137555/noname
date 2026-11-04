@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 
@@ -44,6 +46,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 	const rooms = new Map<string, Room>();
 	const events: EventItem[] = [];
 
+	const credentials = new Map<string, string>();
 	const bannedKeys = new Set<string>();
 	const bannedIps = new Set<string>();
 	const bannedKeyWords: string[] = [];
@@ -66,14 +69,16 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 		sendl(client: Client, ...args: any[]) {
 			try {
+				if (client.readyState !== WebSocket.OPEN) return;
+				if (client.bufferedAmount > 4 * 1024 * 1024) return client.terminate();
 				client.send(JSON.stringify(args));
 			} catch {
-				client.close();
+				client.terminate();
 			}
 		},
 
 		newId(): string {
-			return Math.floor(1e9 + Math.random() * 9e9).toString();
+			return randomUUID();
 		},
 
 		buildRoomList(): any[] {
@@ -110,7 +115,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 		buildClientList(): any[] {
 			const out: any[] = [];
 			clients.forEach(c => {
-				out.push([c.nickname, c.avatar, !c.room, c.status, c.wsid, c.onlineKey]);
+				out.push([c.nickname, c.avatar, !c.room, c.status, c.wsid, c.wsid]);
 			});
 			return out;
 		},
@@ -150,10 +155,10 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 	const handlers: Record<string, (client: Client, ...args: any[]) => void> = {
 		create(client: Client, key: string, nickname: string, avatar: string, config: any, mode: string) {
-			if (client.onlineKey !== key) return;
+			if (client.onlineKey !== key || client.room || rooms.has(key)) return util.sendl(client, "enterroomfailed");
 
 			client.nickname = util.nickname(nickname);
-			client.avatar = avatar;
+			client.avatar = typeof avatar === "string" ? avatar.slice(0, 128) : "caocao";
 
 			const room: Room = { key, owner: client };
 			rooms.set(key, room);
@@ -167,12 +172,10 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 		enter(client: Client, key: string, nickname: string, avatar: string) {
 			const room = rooms.get(key);
-			if (!room) return util.sendl(client, "enterroomfailed");
+			if (!room || client.room) return util.sendl(client, "enterroomfailed");
 
 			client.nickname = util.nickname(nickname);
-			client.avatar = avatar;
-			client.room = room;
-			delete client.status;
+			client.avatar = typeof avatar === "string" ? avatar.slice(0, 128) : "caocao";
 
 			if (!room.owner) return util.sendl(client, "enterroomfailed");
 
@@ -180,6 +183,8 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 				return util.sendl(client, "enterroomfailed");
 			}
 
+			client.room = room;
+			delete client.status;
 			client.owner = room.owner;
 			util.sendl(room.owner, "onconnection", client.wsid);
 			util.updateRooms();
@@ -187,18 +192,23 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 		changeAvatar(client: Client, nickname: string, avatar: string) {
 			client.nickname = util.nickname(nickname);
-			client.avatar = avatar;
+			client.avatar = typeof avatar === "string" ? avatar.slice(0, 128) : "caocao";
 			util.updateClients();
 		},
 
 		key(client: Client, id: any) {
-			if (!id || typeof id !== "object") {
+			if (!Array.isArray(id) || typeof id[0] !== "string" || !id[0] || id[0].length > 128 || (client.onlineKey && client.onlineKey !== id[0]) || [...clients.values()].some(other => other !== client && other.onlineKey === id[0])) {
 				util.sendl(client, "denied", "key");
-				return client.close();
+				return client.terminate();
 			}
+			if (typeof id[2] !== "string" || id[2].length < 32 || id[2].length > 256) return client.close(1008, "Session credential required");
+			const credential = createHash("sha256").update(id[2]).digest("hex");
+			if (credentials.has(id[0]) && credentials.get(id[0]) !== credential) return client.close(1008, "Invalid credential");
+			if (!credentials.has(id[0]) && credentials.size >= 10000) return client.close(1013, "Capacity reached");
+			credentials.set(id[0], credential);
 			if (bannedKeys.has(id[0])) {
 				bannedIps.add(client.clientIp);
-				return client.close();
+				return client.terminate();
 			}
 			client.onlineKey = id[0];
 			clearTimeout(client.keyCheck);
@@ -236,6 +246,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 					}
 				}
 			} else if (cfg && typeof cfg === "object" && "utc" in cfg && "day" in cfg && "hour" in cfg && "content" in cfg) {
+				if (typeof cfg.content !== "string" || cfg.content.length > 2000 || !Number.isFinite(cfg.utc) || !Number.isInteger(cfg.day) || !Number.isInteger(cfg.hour)) return;
 				if (events.length >= 20) util.sendl(client, "eventsdenied", "total");
 				else if (cfg.utc <= now) util.sendl(client, "eventsdenied", "time");
 				else if (util.isBanned(cfg.content)) util.sendl(client, "eventsdenied", "ban");
@@ -263,12 +274,13 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			if (room.servermode) {
 				room.servermode = false;
 			}
+			if (!config || typeof config !== "object" || Array.isArray(config)) return;
 			room.config = config;
 			util.updateRooms();
 		},
 
 		status(client: Client, str: any) {
-			if (typeof str === "string") client.status = str;
+			if (typeof str === "string") client.status = str.slice(0, 128);
 			else delete client.status;
 			util.updateClients();
 		},
@@ -292,6 +304,8 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 	const handleConnection = (ws: WebSocket, req: IncomingMessage) => {
 		const client = ws as Client;
+		client.on("error", () => client.terminate());
+		if (clients.size >= 1000) return client.terminate();
 		const ip = req.socket.remoteAddress ?? "";
 
 		// ban check
@@ -322,12 +336,19 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			try {
 				client.send("heartbeat");
 			} catch {
-				client.close();
+				client.terminate();
 			}
 		}, 60000);
 
 		// message handler
+		let windowStart = Date.now();
+		let messageCount = 0;
 		client.on("message", msg => {
+			if (Date.now() - windowStart > 1000) {
+				windowStart = Date.now();
+				messageCount = 0;
+			}
+			if (++messageCount > 200) return client.close(1008, "Rate limit");
 			const raw = msg.toString();
 			if (raw === "heartbeat") {
 				client.beat = false;
@@ -352,10 +373,12 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			if (arr.shift() !== "server") return;
 
 			const type = arr.shift();
-			const handler = handlers[type];
-			if (!handler) return;
-
-			handler(client, ...arr);
+			if (typeof type !== "string" || !Object.hasOwn(handlers, type) || (type !== "key" && !client.onlineKey)) return;
+			try {
+				handlers[type](client, ...arr);
+			} catch {
+				client.close(1008, "Invalid message");
+			}
 		});
 
 		// disconnect handler
@@ -368,6 +391,8 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 					// notify all clients in this room
 					clients.forEach(c => {
 						if (c.room === room && c !== client) {
+							delete c.room;
+							delete c.owner;
 							util.sendl(c, "selfclose");
 						}
 					});
@@ -390,7 +415,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			if (wss) return Promise.resolve();
 
 			return new Promise<void>((resolve, reject) => {
-				const server = new WebSocketServer({ port });
+				const server = new WebSocketServer({ port, host: options.host, maxPayload: 1024 * 1024 });
 
 				const handleError = (error: Error) => {
 					server.off("listening", handleListening);
@@ -399,7 +424,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 					reject(error);
 				};
 				const handleListening = () => {
-					server.off("error", handleError);
+					server.on("error", error => console.error("WebSocket server error", error));
 					resolve();
 				};
 
@@ -419,7 +444,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			const curClients = [...clients];
 			for (const [_, client] of curClients) {
 				clearClientTimers(client);
-				client.close();
+				client.terminate();
 			}
 
 			return new Promise<void>((resolve, reject) => {

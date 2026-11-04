@@ -13,7 +13,6 @@ import { LibInit } from "./init/index.js";
 import { Announce } from "./announce/index.js";
 import { experimental } from "./experimental/index.js";
 import * as Element from "./element/index.js";
-import { updateURLs } from "./update-urls.js";
 import { defaultHooks } from "./hooks/index.js";
 import { security, ErrorManager } from "@/util/sandbox.js";
 import { assetURL, userAgentLowerCase, GeneratorFunction, AsyncFunction, characterDefaultPicturePath } from "@/util/index.js";
@@ -31,14 +30,10 @@ const html = dedent;
 export class Library {
 	configprefix = "noname_0.9_";
 	versionOL = 27;
-	updateURLS = updateURLs;
-	updateURL = updateURLs.github;
-	mirrorURL = updateURLs.coding;
 	hallURL = "";
 	assetURL = assetURL;
 	userAgent = userAgentLowerCase;
 	characterDefaultPicturePath = characterDefaultPicturePath;
-	changeLog = [];
 	updates = [];
 	canvasUpdates = [];
 	/**
@@ -987,13 +982,13 @@ export class Library {
 				compatible: {
 					name: "兼容模式",
 					init: true,
-					intro: "提供部分即将废弃api的实现，使用老扩展时建议开启。<br/>注：这些api将在下个版本移除，扩展作者请关闭此选项以进行适配。（重启后生效）",
+					intro: "提供旧游戏 API 的兼容实现（重启后生效）。",
 					restart: true,
 				},
 				ignore_error: {
 					name: "无视报错",
 					init: false,
-					intro: "不以弹窗形式报错。<br/>注：此选项仅保证部分不影响运行的错误不会令游戏卡死，不保证报错后结算正常。影响游戏运行的错误请通知扩展作者适配。",
+					intro: "不以弹窗形式报错。<br/>注：此选项仅保证部分不影响运行的错误不会令游戏卡死，不保证报错后结算正常。影响游戏运行的错误请反馈给维护者。",
 				},
 				confirm_exit: {
 					name: "确认退出",
@@ -1418,7 +1413,7 @@ export class Library {
 				},
 				max_loadtime: {
 					name: "最长载入时间",
-					intro: "设置游戏从启动到完成载入所需的最长时间，超过此时间未完成载入会报错，若设备较慢或安装了较多扩展可适当延长此时间",
+					intro: "设置游戏从启动到完成载入所需的最长时间，超过此时间未完成载入会报错，设备较慢时可适当延长此时间",
 					init: "5000",
 					unfrequent: true,
 					item: {
@@ -1455,12 +1450,6 @@ export class Library {
 						}
 					},
 				},
-				auto_check_update: {
-					name: "自动检查游戏更新",
-					intro: "进入游戏时检查更新",
-					init: false,
-					unfrequent: true,
-				},
 				lucky_star: {
 					name: "幸运星模式",
 					intro: "在涉及随机数等的技能中，必定得到效果最好的结果。（联机模式无效）",
@@ -1492,139 +1481,11 @@ export class Library {
 					},
 					unfrequent: true,
 				},
-				extension_auto_import: {
-					name: "自动导入扩展",
-					intro: dedent`
-						开启后无名杀会自动导入扩展目录下的扩展（以此法导入的扩展默认关闭）
-						<br />
-						※ 如果你的运行环境不支持文件操作，则该选项无效
-						<br />
-						※ 鉴于不同平台下文件操作的性能区别，开启后可能会降低加载速度
-					`,
-					init: false,
-					async onclick(bool) {
-						await game.promises.saveConfig("extension_auto_import", bool);
-					},
-					unfrequent: true,
-				},
-				fuck_sojson: {
-					name: "检测加密扩展",
-					init: false,
-					unfrequent: true,
-				},
-				update_link: {
-					name: "更新地址",
-					init: "coding",
-					unfrequent: true,
-					item: {
-						coding: "URC",
-						github: "GitHub",
-					},
-					onclick(item) {
-						game.saveConfig("update_link", item);
-						lib.updateURL = lib.updateURLS[item] || lib.updateURLS.coding;
-					},
-				},
-				extension_source: {
-					name: "获取扩展地址",
-					init: "GitHub Proxy",
-					unfrequent: true,
-					item: {},
-					intro: () => `获取在线扩展时的地址。当前地址：${document.createElement("br").outerHTML}${lib.config.extension_sources[lib.config.extension_source]}`,
-				},
-				extension_create: {
-					name: "添加获取扩展地址",
-					clear: true,
-					unfrequent: true,
-					onclick() {
-						game.prompt("请输入地址名称", function (str) {
-							if (str) {
-								var map = lib.config.extension_sources;
-								game.prompt("请输入" + str + "的地址", function (str2) {
-									if (str2) {
-										delete map[str];
-										map[str] = str2;
-										game.saveConfig("extension_sources", map);
-										game.saveConfig("extension_source", str);
-										var nodexx = ui.extension_source;
-										nodexx.updateInner();
-										var nodeyy = nodexx._link.menu;
-										var nodezz = nodexx._link.config;
-										for (var i = 0; i < nodeyy.childElementCount; i++) {
-											if (nodeyy.childNodes[i]._link == str) {
-												nodeyy.childNodes[i].remove();
-												break;
-											}
-										}
-										var textMenu = ui.create.div("", str, nodeyy, function () {
-											var node = this.parentNode._link;
-											var config = node._link.config;
-											node._link.current = this.link;
-											var tmpName = node.lastChild.innerHTML;
-											node.lastChild.innerHTML = config.item[this._link];
-											if (config.onclick) {
-												if (config.onclick.call(node, this._link, this) === false) {
-													node.lastChild.innerHTML = tmpName;
-												}
-											}
-											if (config.update) {
-												config.update();
-											}
-										});
-										textMenu._link = str;
-										nodezz.item[name] = str;
-										alert("已添加扩展地址：" + str);
-									}
-								});
-							}
-						});
-					},
-				},
-				extension_delete: {
-					name: "删除当前扩展地址",
-					clear: true,
-					unfrequent: true,
-					onclick() {
-						var bool = false,
-							map = lib.config.extension_sources;
-						for (var i in map) {
-							if (i != lib.config.extension_source) {
-								bool = true;
-								break;
-							}
-						}
-						if (!bool) {
-							alert("不能删除最后一个扩展地址！");
-							return;
-						}
-						var name = lib.config.extension_source;
-						game.saveConfig("extension_source", i);
-						delete map[name];
-						game.saveConfig("extension_sources", map);
-						var nodexx = ui.extension_source;
-						nodexx.updateInner();
-						var nodeyy = nodexx._link.menu;
-						var nodezz = nodexx._link.config;
-						for (var i = 0; i < nodeyy.childElementCount; i++) {
-							if (nodeyy.childNodes[i]._link == name) {
-								nodeyy.childNodes[i].remove();
-								break;
-							}
-						}
-						delete nodezz.item[name];
-						alert("已删除扩展地址：" + name);
-					},
-				},
 				update: function (config, map) {
 					if ("ontouchstart" in document) {
 						map.touchscreen.show();
 					} else {
 						map.touchscreen.hide();
-					}
-					if (lib.device || lib.node) {
-						map.auto_check_update.show();
-					} else {
-						map.auto_check_update.hide();
 					}
 					if (lib.device) {
 						map.enable_vibrate.show();
@@ -4179,11 +4040,6 @@ export class Library {
 					} else {
 						map.show_deckMonitor_online.hide();
 					}*/
-					if (lib.config.show_extensionmaker) {
-						map.show_extensionshare.show();
-					} else {
-						map.show_extensionshare.hide();
-					}
 				},
 				show_history: {
 					name: "出牌记录栏",
@@ -4835,16 +4691,6 @@ export class Library {
 					init: false,
 					unfrequent: true,
 				},
-				show_extensionmaker: {
-					name: "显示制作扩展",
-					init: true,
-					unfrequent: true,
-				},
-				show_extensionshare: {
-					name: "显示分享扩展",
-					init: true,
-					unfrequent: true,
-				},
 				show_characternamepinyin: {
 					name: "显示武将名注解",
 					intro: "在武将资料卡显示武将名及其注解、性别、势力、体力等信息",
@@ -5144,22 +4990,6 @@ export class Library {
 					},
 					clear: true,
 				},
-				reset_tutorial: {
-					name: "重置新手向导",
-					onclick() {
-						if (this.firstChild.innerHTML != "已重置") {
-							this.firstChild.innerHTML = "已重置";
-							game.saveConfig("new_tutorial", false);
-							game.saveConfig("prompt_hidebg");
-							game.saveConfig("prompt_hidepack");
-							var that = this;
-							setTimeout(function () {
-								that.firstChild.innerHTML = "重置新手向导";
-							}, 500);
-						}
-					},
-					clear: true,
-				},
 				import_data: {
 					name: "导入游戏设置",
 					onclick() {
@@ -5198,78 +5028,6 @@ export class Library {
 						}
 					},
 					clear: true,
-				},
-				remove_extension_onfig: {
-					name: "重置无效扩展",
-					clear: true,
-					async onclick() {
-						if (this.firstChild.innerHTML != "已重置") {
-							let config = lib.config;
-							if (get.is.object(config)) {
-								let extensionList = config.extensions;
-								for (let name of extensionList) {
-									let num = await game.promises.checkDir(`extension/${name}`);
-									if (num !== 1) {
-										game.removeExtension(name);
-									} else {
-										let all = await game.promises.getFileList(`extension/${name}`);
-										if (all?.[1].length) {
-											const hasExtensionJs = all[1].includes("extension.js");
-											const hasInfoJson = all[1].includes("info.json");
-
-											if (!hasExtensionJs) {
-												const message = hasInfoJson ? `扩展${name}有 info.json 但缺少 extension.js 文件` : `扩展${name}缺少必须的 extension.js 文件`;
-												console.error(message);
-												game.removeExtension(name);
-											}
-										}
-									}
-								}
-							}
-							this.firstChild.innerHTML = "已重置";
-							const that = this;
-							setTimeout(function () {
-								that.firstChild.innerHTML = "重置无效扩展";
-								setTimeout(function () {
-									let ret = confirm(`检测完成，已为你清除无效配置，是否重启？`);
-									if (ret) {
-										game.reload();
-									}
-								});
-							}, 500);
-						}
-					},
-				},
-				redownload_game: {
-					name: "重新下载游戏",
-					onclick() {
-						var node = this;
-						if (node._clearing) {
-							localStorage.removeItem("noname_inited");
-							game.reload();
-							return;
-						}
-						node._clearing = true;
-						node.firstChild.innerHTML = "单击以确认 (3)";
-						setTimeout(function () {
-							node.firstChild.innerHTML = "单击以确认 (2)";
-							setTimeout(function () {
-								node.firstChild.innerHTML = "单击以确认 (1)";
-								setTimeout(function () {
-									node.firstChild.innerHTML = "重新下载游戏";
-									delete node._clearing;
-								}, 1000);
-							}, 1000);
-						}, 1000);
-					},
-					clear: true,
-				},
-				update: function (config, map) {
-					if (lib.device || lib.node) {
-						map.redownload_game.show();
-					} else {
-						map.redownload_game.hide();
-					}
 				},
 				// trim_game:{
 				// 	name:'隐藏非官方扩展包',
@@ -5447,18 +5205,18 @@ export class Library {
 				},
 			},
 			hide: {
-				name: "隐藏此扩展",
+				name: "隐藏此内容包",
 				clear: true,
 				onclick() {
-					if (this.firstChild.innerHTML == "隐藏此扩展") {
-						this.firstChild.innerHTML = "此扩展将在重启后隐藏";
+					if (this.firstChild.innerHTML == "隐藏此内容包") {
+						this.firstChild.innerHTML = "此内容包将在重启后隐藏";
 						lib.config.hiddenPlayPack.add("cardpile");
 						if (!lib.config.prompt_hidepack) {
-							alert("隐藏的扩展包可通过选项-其它-重置隐藏内容恢复");
+							alert("隐藏的内容包可通过选项-其它-重置隐藏内容恢复");
 							game.saveConfig("prompt_hidepack", true);
 						}
 					} else {
-						this.firstChild.innerHTML = "隐藏此扩展";
+						this.firstChild.innerHTML = "隐藏此内容包";
 						lib.config.hiddenPlayPack.remove("cardpile");
 					}
 					game.saveConfig("hiddenPlayPack", lib.config.hiddenPlayPack);
@@ -5512,18 +5270,18 @@ export class Library {
 				init: false,
 			},
 			hide: {
-				name: "隐藏此扩展",
+				name: "隐藏此内容包",
 				clear: true,
 				onclick() {
-					if (this.firstChild.innerHTML == "隐藏此扩展") {
-						this.firstChild.innerHTML = "此扩展将在重启后隐藏";
+					if (this.firstChild.innerHTML == "隐藏此内容包") {
+						this.firstChild.innerHTML = "此内容包将在重启后隐藏";
 						lib.config.hiddenPlayPack.add("boss");
 						if (!lib.config.prompt_hidepack) {
-							alert("隐藏的扩展包可通过选项-其它-重置隐藏内容恢复");
+							alert("隐藏的内容包可通过选项-其它-重置隐藏内容恢复");
 							game.saveConfig("prompt_hidepack", true);
 						}
 					} else {
-						this.firstChild.innerHTML = "隐藏此扩展";
+						this.firstChild.innerHTML = "隐藏此内容包";
 						lib.config.hiddenPlayPack.remove("boss");
 					}
 					game.saveConfig("hiddenPlayPack", lib.config.hiddenPlayPack);
@@ -5576,18 +5334,18 @@ export class Library {
 				},
 			},
 			hide: {
-				name: "隐藏此扩展",
+				name: "隐藏此内容包",
 				clear: true,
 				onclick() {
-					if (this.firstChild.innerHTML == "隐藏此扩展") {
-						this.firstChild.innerHTML = "此扩展将在重启后隐藏";
+					if (this.firstChild.innerHTML == "隐藏此内容包") {
+						this.firstChild.innerHTML = "此内容包将在重启后隐藏";
 						lib.config.hiddenPlayPack.add("coin");
 						if (!lib.config.prompt_hidepack) {
-							alert("隐藏的扩展包可通过选项-其它-重置隐藏内容恢复");
+							alert("隐藏的内容包可通过选项-其它-重置隐藏内容恢复");
 							game.saveConfig("prompt_hidepack", true);
 						}
 					} else {
-						this.firstChild.innerHTML = "隐藏此扩展";
+						this.firstChild.innerHTML = "隐藏此内容包";
 						lib.config.hiddenPlayPack.remove("coin");
 					}
 					game.saveConfig("hiddenPlayPack", lib.config.hiddenPlayPack);
@@ -7103,13 +6861,6 @@ export class Library {
 						four: "对抗",
 						three: "统率",
 						two: "欢乐",
-						guandu: "官渡",
-						jiange: "剑阁",
-						siguo: "四国",
-						standard: "自由",
-						// endless:'无尽',
-						// triple:'血战',
-						// one:'<span style="display:inline-block;width:100%;text-align:center">1v1</span>',
 					},
 					restart: true,
 					frequent: true,
@@ -9118,7 +8869,6 @@ export class Library {
 			game.saveConfig("show_favourite", false);
 			game.saveConfig("animation", false);
 			game.saveConfig("hover_all", false);
-			game.saveConfig("asset_version", "v1.9");
 			// game.saveConfig('characters',lib.config.all.characters);
 			// game.saveConfig('cards',lib.config.all.cards);
 			game.saveConfig("plays", ["cardpile"]);
@@ -10315,7 +10065,7 @@ export class Library {
 				var message;
 				try {
 					message = JSON.parse(messageevent.data);
-					if (!Array.isArray(message) || typeof lib.message.client[message[0]] !== "function") {
+					if (!Array.isArray(message) || typeof message[0] !== "string" || !Object.hasOwn(lib.message.client, message[0]) || typeof lib.message.client[message[0]] !== "function") {
 						throw new Error("err");
 					}
 					if (game.sandbox) {
@@ -10335,7 +10085,12 @@ export class Library {
 					console.log("invalid message: " + messageevent.data);
 					return;
 				}
-				lib.message.client[message.shift()].apply(null, message);
+				try {
+					lib.message.client[message.shift()].apply(null, message);
+				} catch (error) {
+					console.error(error);
+					this.close();
+				}
 			},
 			onerror: function (e) {
 				if (this._nocallback) {
@@ -12420,7 +12175,13 @@ export class Library {
 				ui.create.connecting(true);
 			},
 			roomlist: function (list, events, clients, wsid) {
-				game.send("server", "key", [game.onlineKey, lib.version]);
+				let secret = localStorage.getItem(lib.configprefix + "session_secret");
+				if (!secret) {
+					const bytes = crypto.getRandomValues(new Uint8Array(32));
+					secret = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+					localStorage.setItem(lib.configprefix + "session_secret", secret);
+				}
+				game.send("server", "key", [game.onlineKey, lib.version, secret]);
 				game.online = true;
 				game.onlinehall = true;
 				lib.config.recentIP.remove(_status.ip);
@@ -13217,7 +12978,7 @@ export class Library {
 						alert("加入失败：房间拒绝你加入");
 						break;
 					case "key":
-						alert("您的游戏版本过低，请升级到最新版");
+						alert("游戏版本不一致，请使用相同版本的完整游戏包");
 						game.saveConfig("tmp_owner_roomId");
 						game.saveConfig("tmp_user_roomId");
 						game.saveConfig("reconnect_info");

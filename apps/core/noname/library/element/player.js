@@ -15161,10 +15161,18 @@ export class Player extends HTMLDivElement {
 		var pw = ui.arena.offsetWidth;
 		var cardWidth = 105;
 		var cardGap = 2;
-		var totalWidth = cards.filter(i => !i.subThrow).length * cardWidth + (cards.filter(i => !i.subThrow).length - 1) * cardGap;
+		const visibleCardCount = cards.filter(i => !i.subThrow).length;
+		const stackedCards = new Map();
+		for (const card of cards)
+			if (card.subThrow) {
+				const id = card.node.throw_id;
+				if (!stackedCards.has(id)) stackedCards.set(id, []);
+				stackedCards.get(id).push(card);
+			}
+		var totalWidth = visibleCardCount * cardWidth + (visibleCardCount - 1) * cardGap;
 		var maxWidth = pw * 0.7;
 		var limitWidth = Math.min(maxWidth, pw);
-		var margin = totalWidth > limitWidth ? (limitWidth - cardWidth) / (cards.filter(i => !i.subThrow).length - 1) : cardWidth + cardGap;
+		var margin = totalWidth > limitWidth ? (limitWidth - cardWidth) / (visibleCardCount - 1) : cardWidth + cardGap;
 		var actualWidth = Math.min(totalWidth, limitWidth);
 		var offsetX = -actualWidth / 2 + cardWidth / 2;
 		var infoOffset = cardWidth + cardGap - margin;
@@ -15175,7 +15183,7 @@ export class Player extends HTMLDivElement {
 			var x = Math.round(offsetX + j * margin);
 			x -= dlcX;
 			let id = cards[j]?.node?.throw_id;
-			const node_Stacking = cards.filter(n => n.subThrow && n.node.throw_id == id).slice(0);
+			const node_Stacking = stackedCards.get(id) || [];
 			const index = node_Stacking.indexOf(cards[j]);
 			if (index != -1) {
 				let xx = 80;
@@ -15903,16 +15911,15 @@ export class Player extends HTMLDivElement {
 						}
 					};
 				}
-				const suit = get.translation(cardx.suit),
-					number = get.strNumber(cardx.number);
+				const number = get.strNumber(cardx.number);
 				if (isViewAsCard) {
 					cardx.cards = cards || [];
 					cardx.viewAs = card.name;
-					cardx.node.name2.innerHTML = `${suit}${number} [${cardShownName}]`;
+					cardx.setEquipmentLabel(cardShownName, cardx.suit, number, true);
 					cardx.classList.add("fakeequip");
 				} else {
 					delete cardx.viewAs;
-					cardx.node.name2.innerHTML = `${suit}${number} ${cardShownName}`;
+					cardx.setEquipmentLabel(cardShownName, cardx.suit, number);
 					cardx.classList.remove("fakeequip");
 				}
 				let equipped = false,

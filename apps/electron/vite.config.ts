@@ -31,6 +31,8 @@ export default defineConfig({
 				vite: {
 					build: {
 						outDir: "dist/app/",
+						lib: false,
+						rollupOptions: { input: "app/preload.ts", output: { format: "cjs", entryFileNames: "preload.cjs" } },
 						// rollupOptions: {
 						// 	output: {
 						// 		preserveModules: true,

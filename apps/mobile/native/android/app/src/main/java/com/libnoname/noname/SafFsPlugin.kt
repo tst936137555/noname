@@ -73,6 +73,10 @@ class SafFsPlugin : Plugin() {
     fun statEntry(call: PluginCall) {
         wrap(call) {
             val entryName = call.getString("entryName") ?: throw IllegalArgumentException("缺少 entryName")
+            val bundledType = store.assetType(entryName)
+            if (bundledType != EntryType.NONE) {
+                return@wrap JSObject().put("type", if (bundledType == EntryType.FILE) "file" else "directory")
+            }
             val file = store.findSaf(entryName)
             JSObject().put("type", when {
                 file != null && file.isFile -> "file"
@@ -204,6 +208,7 @@ class SafFsPlugin : Plugin() {
     }
 
     private fun openOverlayInput(path: String): java.io.InputStream {
+        store.openAsset(path)?.let { return it }
         val safFile = store.findSaf(path)
         if (safFile != null) {
             if (!safFile.isFile) throw IllegalArgumentException("$path 不是文件")

@@ -1,40 +1,24 @@
 window.noname_package = {
 	character: {
-		//经典标包＋神话再临
 		standard: "标准",
 		shenhua: "神话再临",
 		extra: "经典神将",
-		//一将成名+界限突破
 		yijiang: "一将成名",
 		refresh: "界限突破",
-		//新时代通用武将
 		sp: "璀璨星河",
 		sp2: "系列专属",
 		newjiang: "新一将成名",
-		//OL服
 		onlyOL: "OL专属",
 		yingbian: "文德武备",
 		clan: "门阀士族",
-		//十周年服
 		huicui: "群英荟萃",
 		xianding: "限定专属",
-		//移动服+外服
 		mobile: "移动版",
 		shiji: "始计篇",
 		sb: "谋攻篇",
 		bingshi: "兵势篇",
-		tw: "外服武将",
-		//各服联动+怀旧
 		collab: "联动卡",
 		old: "怀旧",
-		//线下系列
-		offline: "线下武将",
-		jsrg: "江山如故",
-		sxrm: "蚀心入魔",
-		sixiang: "四象封印",
-		//DIY系列
-		diy: "DIY",
-		key: "Key",
 	},
 	card: {
 		standard: "标准",
@@ -46,25 +30,15 @@ window.noname_package = {
 		sp: "忠胆英杰",
 		zhulu: "逐鹿天下",
 		huodong: "活动卡牌",
-		xianxia: "线下卡牌",
 	},
-	play: {
-		boss: "诸神降临",
-		cardpile: "牌堆补充",
-		coin: "富甲天下",
-	},
+	play: {},
 	mode: {
 		identity: "身份",
 		guozhan: "国战",
 		versus: "对决",
 		connect: "联机",
-		boss: "挑战",
 		doudizhu: "斗地主",
 		single: "单挑",
-		chess: "战棋",
-		tafang: "塔防",
-		stone: "炉石",
-		brawl: "乱斗",
 	},
 	submode: {
 		identity: {
@@ -80,14 +54,6 @@ window.noname_package = {
 			four: "四人对抗",
 			three: "统率三军",
 			two: "欢乐成双",
-			jiange: "守卫剑阁",
-			siguo: "四国争霸",
-			standard: "自由对决",
-		},
-		chess: {
-			combat: "战棋模式",
-			three: "战棋统率",
-			leader: "战棋君主",
 		},
 		single: {
 			normal: "新1v1",
@@ -138,8 +104,6 @@ window.noname_package = {
 		shousha: "方正隶变_GBK",
 	},
 	theme: {
-		woodden: "木纹",
-		music: "音乐",
-		simple: "简约",
+		decade: "十周年",
 	},
 };

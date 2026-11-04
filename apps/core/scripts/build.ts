@@ -4,8 +4,11 @@ import { join } from "path";
 import { existsSync, readdirSync, writeFileSync } from "fs";
 import { Target, viteStaticCopy } from "vite-plugin-static-copy";
 import generateImportMap from "./vite-plugin-importmap";
-import jit from "@noname/jit";
 import type { BuildChannel, BuildInfo } from "../noname/util/meta";
+
+import { buildConcurrency, runBuildWorkers } from "../../../scripts/lib/build-workers.js";
+
+import { characterPacks, cardPacks, modes } from "../noname/util/product.js";
 
 const root = join(import.meta.dirname, "..");
 
@@ -13,9 +16,10 @@ const root = join(import.meta.dirname, "..");
  * 构建脚本入口。
  *
  * 负责收集本体构建需要复制的静态资源、各类单独构建包体的入口，
- * 然后依次执行本体构建和包体构建。
+ * 本体构建完成后，再在线程中并行构建各类包体。
  */
 async function main() {
+	const concurrency = buildConcurrency();
 	/**
 	 * 编译目标
 	 *
@@ -31,16 +35,12 @@ async function main() {
 		vue: "vue/dist/vue.esm-browser.js",
 		"pinyin-pro": "pinyin-pro",
 		dedent: "dedent",
-		// jszip: "jszip",
 	};
 
 	/**
 	 * 本体编译过程需要直接复制的文件
 	 */
 	const staticModules: Target[] = [
-		// { src: "character", dest: "" },
-		// { src: "card", dest: "" },
-		// { src: "mode", dest: "" },
 		{ src: "layout", dest: "" },
 		{ src: "font", dest: "" },
 		{ src: "theme", dest: "" },
@@ -57,26 +57,15 @@ async function main() {
 	 */
 	const individuals: Record<IndividualType, IndividualContent[]> = {
 		character: [],
-		mode: [
-			{ name: "boss", index: "mode/boss.js", source: "mode/boss.js" },
-			{ name: "brawl", index: "mode/brawl.js", source: "mode/brawl.js" },
-			{ name: "chess", index: "mode/chess.js", source: "mode/chess.js" },
-			{ name: "connect", index: "mode/connect.js", source: "mode/connect.js" },
-			{ name: "doudizhu", index: "mode/doudizhu.js", source: "mode/doudizhu.js" },
-			{ name: "guozhan", index: getDirectoryEntry("mode", "guozhan"), source: "mode/guozhan" },
-			{ name: "identity", index: "mode/identity.js", source: "mode/identity.js" },
-			{ name: "realtime", index: "mode/realtime.js", source: "mode/realtime.js" },
-			{ name: "single", index: "mode/single.js", source: "mode/single.js" },
-			{ name: "stone", index: "mode/stone.js", source: "mode/stone.js" },
-			{ name: "tafang", index: "mode/tafang.js", source: "mode/tafang.js" },
-			{ name: "versus", index: "mode/versus.js", source: "mode/versus.js" },
-		],
+		mode: modes.map(name => {
+			const source = name === "guozhan" ? `mode/${name}` : `mode/${name}.js`;
+			return { name, index: name === "guozhan" ? getDirectoryEntry("mode", name) : source, source };
+		}),
 		card: [],
 	};
 
-	// #4427 - 武将包均重写完毕
 	const characterDirectories = readdirSync(join(root, "character"), { withFileTypes: true })
-		.filter(entry => entry.isDirectory())
+		.filter(entry => entry.isDirectory() && characterPacks.includes(entry.name))
 		.sort((a, b) => a.name.localeCompare(b.name));
 	for (const { name } of characterDirectories) {
 		individuals.character.push({
@@ -88,6 +77,7 @@ async function main() {
 
 	// #3941 - 卡牌包均重写完毕
 	for (const file of readdirSync(join(root, "card")).sort()) {
+		if (!cardPacks.includes(getEntryName(file))) continue;
 		const index = `card/${file}`;
 		individuals.card.push({
 			name: getEntryName(file),
@@ -107,7 +97,8 @@ async function main() {
 	// 编译无名杀本体
 	await buildSelf(target, importMap, staticModules);
 
-	// 编译脱离本体单独输出的包体
+	// 先收集任务，再由独立线程构建互不重叠的输出目录。
+	const jobs = [];
 	for (const [type, content] of Object.entries(individuals)) {
 		// 构建vite编译输入
 		const input: Record<string, string> = {};
@@ -118,16 +109,18 @@ async function main() {
 		// 获取需要单独复制的文件
 		const copies: Target[] = [];
 		for (const file of readdirSync(join(root, type)).sort()) {
-			if (getEntryName(file) in input) {
+			if (getEntryName(file) in input || type !== "character" || !["rank.js", "replace.js", "perfectPairs.js"].includes(file)) {
 				continue;
 			}
 
 			copies.push({ src: `${type}/${file}`, dest: "" });
 		}
 
-		await buildIndividual(type, target, input, importMap, copies);
+		jobs.push({ type, target, input, importMap, copies });
 	}
 
+	console.log(`包体构建使用 ${Math.min(concurrency, jobs.length)} 个工作线程`);
+	await runBuildWorkers(new URL("./build-individual.js", import.meta.url), jobs, concurrency);
 	writeBuildInfo();
 }
 
@@ -169,47 +162,7 @@ async function buildSelf(target: string | string[], importMap: Record<string, st
 				},
 			},
 		},
-		plugins: [viteStaticCopy({ targets: copies }), generateImportMap(importMap), jit()],
-	});
-}
-
-/**
- * 构建需要脱离本体单独输出的包体。
- *
- * @param type 包体类型，同时也是输出目录名
- * @param target Vite/Rollup的浏览器编译目标
- * @param input Rollup入口配置，key会成为最终输出文件名
- * @param importMap 用于决定哪些依赖在单独构建时保持外部引用
- * @param copies 单独构建阶段需要原样复制的同类包体
- */
-async function buildIndividual(type: string, target: string | string[], input: Record<string, string>, importMap: Record<string, string>, copies: Target[]) {
-	await build({
-		build: {
-			target,
-			sourcemap: false,
-			minify: false,
-			outDir: `dist/${type}`,
-			rollupOptions: {
-				preserveEntrySignatures: "strict",
-				treeshake: true,
-				external: Object.keys(importMap),
-				input,
-				output: {
-					preserveModules: false,
-					preserveModulesRoot: "./",
-
-					// 去掉 hash
-					entryFileNames: "[name].js", // 入口文件
-					chunkFileNames: "[name].js", // 代码分块
-					assetFileNames: "[name][extname]", // 静态资源
-				},
-				onwarn(warning, warn) {
-					if (warning.code === "CYCLIC_CROSS_CHUNK_REEXPORT") return;
-					warn(warning);
-				},
-			},
-		},
-		plugins: [viteStaticCopy({ targets: copies })],
+		plugins: [viteStaticCopy({ targets: copies }), generateImportMap(importMap)],
 	});
 }
 

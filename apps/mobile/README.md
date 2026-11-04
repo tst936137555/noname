@@ -4,7 +4,9 @@ Android/iOS client for Noname, built with Capacitor.
 
 ## Build Flow
 
-The project serves the built web app from `../../dist`.
+The project serves the complete built game from `../../dist`, including all art, audio and fonts. Game resources always load from the installed app; external files cannot replace bundled code or resources. Android starts without a directory picker and requests directory access only when exporting user data.
+
+The only maintained game version is `apps/core/package.json`. Android reads it directly; mobile sync derives the iOS version and platform build numbers from it. Neither platform maintains an independent game/resource version.
 
 ```bash
 pnpm build

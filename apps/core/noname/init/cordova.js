@@ -1,5 +1,5 @@
 //@ts-nocheck
-import { checkVersion } from "../library/update.js";
+import { checkVersion } from "../util/version.js";
 
 export default async function cordovaReady({ lib, game, get, _status, ui }) {
 	lib.path = (await import("path-browserify-esm")).default;
@@ -15,29 +15,6 @@ export default async function cordovaReady({ lib, game, get, _status, ui }) {
 	const nonameInitialized = localStorage.getItem("noname_inited");
 
 	if (lib.device == "android") {
-		// 新客户端导入扩展逻辑
-		window.addEventListener(
-			"importExtension",
-			e => {
-				const extensionName = e.detail.extensionName;
-				lib.config.extensions.add(extensionName);
-				game.saveConfig("extensions", lib.config.extensions);
-				game.saveConfig(`extension_${extensionName}_enable`, true);
-				if (confirm(`扩展${extensionName}已导入成功，是否重启游戏？`)) {
-					game.reload();
-				}
-			},
-			false
-		);
-		window.addEventListener(
-			"importPackage",
-			() => {
-				if (confirm(`离线包/完整包已导入成功，是否重启游戏？`)) {
-					game.reload();
-				}
-			},
-			false
-		);
 		document.addEventListener("pause", function () {
 			if (_status.gameStarted && !_status.event.isMine()) {
 				ui.click.pause();
@@ -116,38 +93,10 @@ export default async function cordovaReady({ lib, game, get, _status, ui }) {
 				})
 				.catch(console.log);
 		}
-		// if (typeof window.NonameAndroidBridge == "undefined" || typeof window.NonameAndroidBridge.getPackageName != "function" || typeof window.NonameAndroidBridge.getPackageVersionCode != "function") {
-		// 	throw new Error("您的安卓客户端版本过低，请升级至最新版");
-		// }
-		// const versionCode = window.NonameAndroidBridge.getPackageVersionCode();
-		// switch (window.NonameAndroidBridge.getPackageName()) {
-		// 	case "com.noname.shijian":
-		// 		if (versionCode < 16007) {
-		// 			throw new Error("您的安卓诗笺版客户端版本过低，请升级至v1.6.7或以上");
-		// 		}
-		// 		break;
-		// 	case "yuri.nakamura.noname_android":
-		// 		if (versionCode < 10904) {
-		// 			throw new Error("您的安卓由理版客户端版本过低，请升级至v1.9.4或以上");
-		// 		}
-		// 		break;
-		// 	case "yuri.nakamura.noname":
-		// 		if (versionCode < 108004) {
-		// 			throw new Error("您的安卓兼容版客户端版本过低，请升级至v1.8.4或以上");
-		// 		}
-		// 		break;
-		// 	case "com.widget.noname.cola":
-		// 		if (versionCode < 10320) {
-		// 			throw new Error("您的安卓增强版客户端版本过低，请升级至v1.3.2或以上");
-		// 		}
-		// 		break;
-		// 	default:
-		// 	// todo: 懒人包提示
-		// }
 	}
 	game.download = function (url, folder, onsuccess, onerror, dev, onprogress) {
 		if (!url.startsWith("http")) {
-			url = get.url(dev) + url;
+			url = new URL(url, new URL(lib.assetURL || "./", document.baseURI)).href;
 		}
 		var fileTransfer = new FileTransfer();
 		game.ensureDirectory(
@@ -159,14 +108,10 @@ export default async function cordovaReady({ lib, game, get, _status, ui }) {
 						onprogress(progressEvent.loaded, progressEvent.total);
 					};
 				}
-				lib.config.brokenFile.add(nonameInitialized + folder);
-				game.saveConfigValue("brokenFile");
 				fileTransfer.download(
 					encodeURI(url),
 					encodeURI(nonameInitialized + folder),
 					function () {
-						lib.config.brokenFile.remove(nonameInitialized + folder);
-						game.saveConfigValue("brokenFile");
 						if (onsuccess) {
 							onsuccess();
 						}
@@ -495,9 +440,6 @@ export default async function cordovaReady({ lib, game, get, _status, ui }) {
 			}
 		);
 	};
-	if (ui.updateUpdate) {
-		ui.updateUpdate();
-	}
 	var showbar = function () {
 		if (window.StatusBar) {
 			if (lib.device == "android") {

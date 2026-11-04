@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, s
 import { resolve } from "path";
 import { spawnSync } from "child_process";
 import { build } from "vite";
+import { syncMobileVersion } from "../../../scripts/lib/game-version.js";
 
 const root = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(root, "../..");
@@ -82,6 +83,7 @@ function patchAndroidAssets() {
 	renameSync(pnpmDir, androidSafePnpmDir);
 }
 
+syncMobileVersion();
 await buildPreload();
 capSync();
 if (platform !== "ios") patchAndroidAssets();

@@ -1,73 +1,111 @@
 {
-	"extension_sources": {
-		"GitHub Proxy": "https://mirror.ghproxy.com/https://raw.githubusercontent.com/libccy/noname-extension/master/",
-		"FastGit": "https://raw.fgit.cf/libccy/noname-extension/master/",
-		"GitHub": "https://raw.githubusercontent.com/libccy/noname-extension/master/"
-	},
-	"extension_source": "GitHub Proxy",
-	"forbidai": ["ns_liuzhang"],
+	"forbidai": [
+		"ns_liuzhang"
+	],
 	"forbidai_user": [],
 	"forbidall": [],
-	"forbidstone": [
+	"forbiddouble": [
 		"zhugedan",
-		"lusu",
-		"chenlin",
-		"yuanshao",
-		"daqiao",
-		"re_daqiao",
-		"zhuran",
-		"huatuo",
-		"wangyi",
-		"caoang",
-		"guojia",
-		"re_guojia",
-		"shen_caocao",
-		"caopi",
-		"guansuo",
-		"xushi"
+		"dongzhuo",
+		"wutugu",
+		"zhangjian"
 	],
-	"forbidchess": ["hetaihou"],
-	"forbidboss": [],
-	"forbiddouble": ["zhugedan", "dongzhuo", "wutugu", "zhangjian"],
-	"forbidthreecard": ["qiankunbiao", "shenhuofeiya"],
-	"zhinang_tricks": ["guohe", "wuxie", "wuzhong", "dongzhuxianji"],
-	"connect_zhinang_tricks": ["guohe", "wuxie", "wuzhong", "dongzhuxianji"],
+	"forbidthreecard": [
+		"qiankunbiao",
+		"shenhuofeiya"
+	],
+	"zhinang_tricks": [
+		"guohe",
+		"wuxie",
+		"wuzhong",
+		"dongzhuxianji"
+	],
+	"connect_zhinang_tricks": [
+		"guohe",
+		"wuxie",
+		"wuzhong",
+		"dongzhuxianji"
+	],
 	"all": {
 		"sgscharacters": [
 			"standard",
 			"shenhua",
-			"refresh",
+			"extra",
 			"yijiang",
-			"newjiang",
-			"sixiang",
+			"refresh",
 			"sp",
 			"sp2",
-			"xianding",
+			"newjiang",
+			"onlyOL",
+			"yingbian",
+			"clan",
 			"huicui",
-			"extra",
-			"old",
+			"xianding",
 			"mobile",
 			"shiji",
-			"bingshi",
-			"tw",
-			"yingbian",
-			"offline",
-			"jsrg",
-			"sxrm",
 			"sb",
-			"clan",
+			"bingshi",
 			"collab",
-			"onlyOL"
+			"old"
 		],
-		"sgscards": ["standard", "extra", "sp", "guozhan", "zhulu", "yingbian", "yongjian"],
-		"sgsmodes": ["identity", "guozhan", "versus", "doudizhu", "single", "brawl", "connect"],
-		"stockmode": ["identity", "guozhan", "versus", "boss", "doudizhu", "single", "chess", "stone", "connect", "brawl", "tafang"],
-		"stockextension": ["boss", "cardpile", "coin"],
-		"layout": ["default", "newlayout"],
-		"theme": ["woodden", "music", "simple"],
-		"card_font": ["xiaozhuan", "huangcao", "caoshu", "xingshu"],
-		"double_hp": ["hejiansan", "pingjun", "zuidazhi", "zuixiaozhi", "zonghe"],
-		"image_background_filter": ["default", "blur", "gray", "sepia", "invert", "saturate", "contrast", "hue", "brightness"]
+		"sgscards": [
+			"standard",
+			"extra",
+			"guozhan",
+			"yingbian",
+			"jiubian",
+			"yongjian",
+			"sp",
+			"zhulu",
+			"huodong"
+		],
+		"sgsmodes": [
+			"identity",
+			"guozhan",
+			"versus",
+			"connect",
+			"doudizhu",
+			"single"
+		],
+		"stockmode": [
+			"identity",
+			"guozhan",
+			"versus",
+			"connect",
+			"doudizhu",
+			"single"
+		],
+		"stockextension": [],
+		"layout": [
+			"long2"
+		],
+		"theme": [
+			"decade"
+		],
+		"card_font": [
+			"xiaozhuan",
+			"huangcao",
+			"caoshu",
+			"xingshu"
+		],
+		"double_hp": [
+			"hejiansan",
+			"pingjun",
+			"zuidazhi",
+			"zuixiaozhi",
+			"zonghe"
+		],
+		"image_background_filter": [
+			"default",
+			"blur",
+			"gray",
+			"sepia",
+			"invert",
+			"saturate",
+			"contrast",
+			"hue",
+			"brightness"
+		]
 	},
 	"game": "sgs",
 	"duration": 500,
@@ -95,8 +133,8 @@
 	"background_music": "music_default",
 	"background_audio": true,
 	"background_speak": true,
-	"glow_phase": "yellow",
-	"die_move": "flip",
+	"glow_phase": "green",
+	"die_move": "off",
 	"skin": {},
 	"gameRecord": {},
 	"extensionInfo": {},
@@ -110,9 +148,8 @@
 	"favouriteCharacter": [],
 	"favouriteMode": [],
 	"recentIP": [],
-	"brokenFile": [],
 	"max_loadtime": "20000",
-	"theme": "simple",
+	"theme": "decade",
 	"layout": "long2",
 	"cardback_style": "liusha",
 	"cardshape": "oblong",
@@ -121,9 +158,7 @@
 	"player_border": "slim",
 	"radius_size": "reduce",
 	"image_character": "default",
-	"image_background": "default",
-	"asset_image": true,
-	"asset_font": true,
+	"image_background": "ol_bg",
 	"card_font": "xiaozhuan",
 	"show_statusbar_ios": "off",
 	"show_statusbar_android": false,
@@ -146,7 +181,7 @@
 	"threed_card": false,
 	"vertical_scroll": false,
 	"handcard_scroll": 0,
-	"animation": true,
+	"animation": false,
 	"skill_animation_type": "default",
 	"paused": false,
 	"title": false,
@@ -161,7 +196,10 @@
 	"intro": "i",
 	"right_click": "pause",
 	"sort": "type_sort",
-	"cards": ["standard", "extra"],
+	"cards": [
+		"standard",
+		"extra"
+	],
 	"characters": [
 		"standard",
 		"shenhua",
@@ -169,27 +207,31 @@
 		"sp2",
 		"yijiang",
 		"newjiang",
-		"sixiang",
 		"refresh",
 		"mobile",
 		"extra",
 		"yingbian",
 		"sb",
-		"tw",
-		"offline",
 		"clan",
 		"collab",
 		"xianding",
 		"huicui",
 		"shiji",
 		"bingshi",
-		"jsrg",
-		"sxrm",
 		"onlyOL"
 	],
-	"moderned_modes": ["guozhan"],
-	"connect_characters": ["diy"],
-	"connect_cards": ["huodong", "guozhan", "sp", "zhulu", "yingbian", "yongjian", "xianxia"],
+	"moderned_modes": [
+		"guozhan"
+	],
+	"connect_characters": [],
+	"connect_cards": [
+		"huodong",
+		"guozhan",
+		"sp",
+		"zhulu",
+		"yingbian",
+		"yongjian"
+	],
 	"plays": [],
 	"extensions": [],
 	"banned": [],
@@ -213,15 +255,78 @@
 		},
 		"identity": {
 			"identity": [
-				["zhu", "fan"],
-				["zhu", "nei", "fan"],
-				["zhu", "zhong", "nei", "fan"],
-				["zhu", "zhong", "nei", "fan", "fan"],
-				["zhu", "zhong", "nei", "fan", "fan", "fan"],
-				["zhu", "zhong", "zhong", "nei", "fan", "fan", "fan"],
-				["zhu", "zhong", "zhong", "nei", "fan", "fan", "fan", "fan"],
-				["zhu", "zhong", "zhong", "zhong", "nei", "fan", "fan", "fan", "fan"],
-				["zhu", "zhong", "zhong", "zhong", "nei", "nei", "fan", "fan", "fan", "fan"]
+				[
+					"zhu",
+					"fan"
+				],
+				[
+					"zhu",
+					"nei",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"nei",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"nei",
+					"fan",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"nei",
+					"fan",
+					"fan",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"zhong",
+					"nei",
+					"fan",
+					"fan",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"zhong",
+					"nei",
+					"fan",
+					"fan",
+					"fan",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"zhong",
+					"zhong",
+					"nei",
+					"fan",
+					"fan",
+					"fan",
+					"fan"
+				],
+				[
+					"zhu",
+					"zhong",
+					"zhong",
+					"zhong",
+					"nei",
+					"nei",
+					"fan",
+					"fan",
+					"fan",
+					"fan"
+				]
 			],
 			"choice": {
 				"zhu": 3,
@@ -231,7 +336,9 @@
 			},
 			"show_identity": true,
 			"difficulty": "normal",
-			"dierestart": true
+			"dierestart": true,
+			"identity_mode": "normal",
+			"player_number": 8
 		},
 		"guozhan": {
 			"difficulty": "normal",
@@ -242,47 +349,212 @@
 	"current_mode": {},
 	"customforbid": [],
 	"forbid": [
-		["huashen"],
-		["rehuashen"],
-		["xinmanjuan"],
-		["xinleiji", "xinfu_jijun"],
-		["reluanji", "jueqing"],
-		["lianying", "rende"],
-		["lianying", "anxian"],
-		["lianying", "yinguo"],
-		["lianying", "qingjian"],
-		["boss_juejing", "rende"],
-		["boss_juejing", "anxian"],
-		["boss_juejing", "yinguo"],
-		["boss_juejing", "qingjian"],
-		["shangshi", "rende"],
-		["shangshi", "anxian"],
-		["shangshi", "yinguo"],
-		["shangshi", "qingjian"],
-		["rende", "relianying"],
-		["anxian", "relianying"],
-		["yinguo", "relianying"],
-		["shenxing", "relianying"],
-		["qingjian", "relianying"],
-		["rende", "yuling"],
-		["anxian", "yuling"],
-		["yinguo", "yuling"],
-		["qingjian", "yuling"],
-		["tuntian", "guidao"],
-		["tuntian", "tiandao"],
-		["tuntian", "huanshi"],
-		["jiushi", "guixin"],
-		["xiuhua", "xuanfeng"],
-		["xiuhua", "duanxing"],
-		["xiuhua", "xiaoji"],
-		["xiuhua", "xiaoji"],
-		["zishu", "xinfu_songsang"],
-		["zishu", "shenxing"],
-		["minishendao", "luoshen"],
-		["minishendao", "reluoshen"],
-		["akane_quanqing", "lianying"],
-		["akane_quanqing", "relianying"],
-		["akane_quanqing", "shangshi"],
-		["dcruyi", "cxliushi"]
-	]
+		[
+			"huashen"
+		],
+		[
+			"rehuashen"
+		],
+		[
+			"xinmanjuan"
+		],
+		[
+			"xinleiji",
+			"xinfu_jijun"
+		],
+		[
+			"reluanji",
+			"jueqing"
+		],
+		[
+			"lianying",
+			"rende"
+		],
+		[
+			"lianying",
+			"anxian"
+		],
+		[
+			"lianying",
+			"yinguo"
+		],
+		[
+			"lianying",
+			"qingjian"
+		],
+		[
+			"boss_juejing",
+			"rende"
+		],
+		[
+			"boss_juejing",
+			"anxian"
+		],
+		[
+			"boss_juejing",
+			"yinguo"
+		],
+		[
+			"boss_juejing",
+			"qingjian"
+		],
+		[
+			"shangshi",
+			"rende"
+		],
+		[
+			"shangshi",
+			"anxian"
+		],
+		[
+			"shangshi",
+			"yinguo"
+		],
+		[
+			"shangshi",
+			"qingjian"
+		],
+		[
+			"rende",
+			"relianying"
+		],
+		[
+			"anxian",
+			"relianying"
+		],
+		[
+			"yinguo",
+			"relianying"
+		],
+		[
+			"shenxing",
+			"relianying"
+		],
+		[
+			"qingjian",
+			"relianying"
+		],
+		[
+			"rende",
+			"yuling"
+		],
+		[
+			"anxian",
+			"yuling"
+		],
+		[
+			"yinguo",
+			"yuling"
+		],
+		[
+			"qingjian",
+			"yuling"
+		],
+		[
+			"tuntian",
+			"guidao"
+		],
+		[
+			"tuntian",
+			"tiandao"
+		],
+		[
+			"tuntian",
+			"huanshi"
+		],
+		[
+			"jiushi",
+			"guixin"
+		],
+		[
+			"xiuhua",
+			"xuanfeng"
+		],
+		[
+			"xiuhua",
+			"duanxing"
+		],
+		[
+			"xiuhua",
+			"xiaoji"
+		],
+		[
+			"xiuhua",
+			"xiaoji"
+		],
+		[
+			"zishu",
+			"xinfu_songsang"
+		],
+		[
+			"zishu",
+			"shenxing"
+		],
+		[
+			"minishendao",
+			"luoshen"
+		],
+		[
+			"minishendao",
+			"reluoshen"
+		],
+		[
+			"akane_quanqing",
+			"lianying"
+		],
+		[
+			"akane_quanqing",
+			"relianying"
+		],
+		[
+			"akane_quanqing",
+			"shangshi"
+		],
+		[
+			"dcruyi",
+			"cxliushi"
+		]
+	],
+	"phonelayout": false,
+	"autostyle": false,
+	"card_style": "default",
+	"player_style": "default",
+	"border_style": "default",
+	"control_style": "default",
+	"image_background_random": false,
+	"image_background_blur": false,
+	"change_skin": false,
+	"change_skin_auto": "off",
+	"name_font": "xinwei",
+	"identity_font": "huangcao",
+	"cardtext_font": "xiaozhuan",
+	"global_font": "default",
+	"suits_font": false,
+	"custom_button": false,
+	"player_height": "default",
+	"player_height_nova": "default",
+	"turned_style": false,
+	"buttoncharacter_style": "default",
+	"cursor_style": "default",
+	"zhishixian": "default",
+	"splash_style": "style1",
+	"ui_zoom": "100%",
+	"autoborder_count": "kill",
+	"autoborder_start": "bronze",
+	"custom_button_system_top": "0x",
+	"custom_button_system_bottom": "0x",
+	"custom_button_control_top": "0x",
+	"custom_button_control_bottom": "0x",
+	"fold_mode": true,
+	"seperate_control": true,
+	"blur_ui": false,
+	"glass_ui": false,
+	"jiu_effect": true,
+	"spread_card": true,
+	"card_animation_info": false,
+	"animation_choose_to_move": true,
+	"target_shake": "off",
+	"link_style2": "chain",
+	"cardtempname": "image",
+	"buttoncharacter_prefix": "default"
 }

@@ -1,22 +1,17 @@
+import { DirectHost } from "../../../packages/server/src/direct-host";
+import { networkInterfaces } from "node:os";
 /// <reference types="vite/client" />
-import { app, BrowserWindow, crashReporter, dialog, Menu, shell } from "electron";
+import { app, BrowserWindow, crashReporter, dialog, Menu, shell, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";
-import remote from "@electron/remote/main/index.js";
 import createApp from "@noname/fs";
-remote.initialize();
 const dirname = path.join(import.meta.dirname, "../");
-createApp({
-	port: 8089,
-	dirname,
-	server: true,
-});
-
 // 获取单实例锁
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
 	// 如果获取失败，说明已经有实例在运行了，直接退出
 	app.quit();
+	process.exit(0);
 }
 
 app.setAppUserModelId("com.libnoname.noname");
@@ -30,16 +25,18 @@ function setPath(path1: any, path2: any) {
 	app.setPath(path1, path2);
 }
 
-setPath("home", path.join(dirname, "Home"));
-setPath("appData", path.join(dirname, "Home", "AppData"));
-setPath("userData", path.join(dirname, "Home", "UserData"));
-setPath("temp", path.join(dirname, "Home", "Temp"));
-setPath("cache", path.join(dirname, "Home", "Cache"));
-//崩溃转储文件存储的目录
-setPath("crashDumps", path.join(dirname, "Home", "crashDumps"));
-//日志目录
-setPath("logs", path.join(dirname, "Home", "logs"));
-
+const userData = app.getPath("userData");
+const legacyData = path.join(dirname, "Home", "UserData");
+if (!fs.existsSync(userData) && fs.existsSync(legacyData)) fs.cpSync(legacyData, userData, { recursive: true, dereference: false });
+setPath("crashDumps", path.join(userData, "crashDumps"));
+setPath("logs", path.join(userData, "logs"));
+const hosts = new Map<number, DirectHost>();
+const hostIp =
+	Object.values(networkInterfaces())
+		.flat()
+		.find(item => item?.family === "IPv4" && !item.internal)?.address || "127.0.0.1";
+let serverReady = false;
+let gameAddress = "http://127.0.0.1:8081";
 //崩溃处理
 crashReporter.start({
 	productName: "无名杀",
@@ -67,10 +64,17 @@ app.setAboutPanelOptions({
 });
 
 process.env["ELECTRON_DEFAULT_ERROR_MODE"] = "true";
-process.env["ELECTRON_DISABLE_SECURITY_WARNINGS"] = "true";
+
 process.noDeprecation = true;
 
 function createWindow() {
+	if (!serverReady) return;
+	const existing = BrowserWindow.getAllWindows()[0];
+	if (existing) {
+		if (existing.isMinimized()) existing.restore();
+		existing.focus();
+		return;
+	}
 	createMainWindow();
 }
 
@@ -81,24 +85,35 @@ function createMainWindow() {
 		title: "无名杀",
 		icon: path.join(dirname, "noname.ico"),
 		webPreferences: {
-			webSecurity: false,
-			preload: path.join(dirname, "app/preload.js"),
-			nodeIntegration: true, //主页面用node
-			nodeIntegrationInSubFrames: true, //子页面用node
-			nodeIntegrationInWorker: true, //worker用node
-			contextIsolation: false, //必须为false
-			plugins: true, //启用插件
-			// @ts-ignore
-			enableRemoteModule: true, //可以调用Remote
-			experimentalFeatures: true, //启用Chromium的实验功能
+			webSecurity: true,
+			preload: path.join(dirname, "app/preload.cjs"),
+			nodeIntegration: false,
+			contextIsolation: true,
+			sandbox: true,
+			additionalArguments: [`--noname-data-root=${dirname}`, `--noname-host-ip=${hostIp}`],
 		},
 	});
-	if (import.meta.env.DEV) {
-		win.loadURL(`http://localhost:8080`);
-	} else {
-		win.loadURL(`http://localhost:8089/index.html`);
-	}
-	remote.enable(win.webContents);
+	void win.loadURL(`${gameAddress}/index.html`);
+	win.webContents.setWindowOpenHandler(({ url }) => {
+		if (/^https?:\/\//.test(url)) void shell.openExternal(url);
+		return { action: "deny" };
+	});
+	win.webContents.on("will-navigate", (event, url) => {
+		if (new URL(url).origin !== new URL(gameAddress).origin) event.preventDefault();
+	});
+	win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
+
+	const contentsId = win.webContents.id;
+	win.webContents.on("did-start-navigation", (_event, _url, _inPlace, mainFrame) => {
+		if (mainFrame) {
+			hosts.get(contentsId)?.stop();
+			hosts.delete(contentsId);
+		}
+	});
+	win.webContents.on("destroyed", () => {
+		hosts.get(contentsId)?.stop();
+		hosts.delete(contentsId);
+	});
 	const menuTemplate: Electron.MenuItemConstructorOptions[] = [
 		{
 			label: "操作",
@@ -151,8 +166,7 @@ function createMainWindow() {
 					label: "版权声明",
 					click: () => {
 						dialog.showMessageBoxSync(win, {
-							message:
-								"【无名杀】属于个人（水乎）开发项目且【完全免费】。如非法倒卖用于牟利将承担法律责任 开发团队将追究到底",
+							message: "【无名杀】属于个人（水乎）开发项目且【完全免费】。如非法倒卖用于牟利将承担法律责任 开发团队将追究到底",
 							type: "info",
 							title: "版权声明",
 							icon: path.join(app.getAppPath(), "app", "noname.ico"),
@@ -166,14 +180,58 @@ function createMainWindow() {
 	return win;
 }
 
-app.whenReady().then(() => {
-	createWindow();
-	app.on("activate", () => {
-		if (BrowserWindow.getAllWindows().length === 0) {
-			createWindow();
+app.whenReady()
+	.then(async () => {
+		if (!import.meta.env.DEV) {
+			const server = createApp({ dirname, server: true, listen: false });
+			await server.listen({ port: 8089, host: "localhost" });
+			gameAddress = "http://localhost:8089";
+			app.on("before-quit", () => {
+				void server.close();
+			});
 		}
+		const trusted = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => {
+			try {
+				return event.senderFrame === event.sender.mainFrame && new URL(event.senderFrame.url).origin === new URL(gameAddress).origin;
+			} catch {
+				return false;
+			}
+		};
+		ipcMain.handle("noname:host-start", async event => {
+			if (!trusted(event) || hosts.has(event.sender.id)) throw new Error("Host request denied");
+			const host = new DirectHost();
+			hosts.set(event.sender.id, host);
+			try {
+				await host.start(payload => {
+					if (!event.sender.isDestroyed()) event.sender.send("noname:host-event", payload);
+				});
+			} catch (error) {
+				hosts.delete(event.sender.id);
+				throw error;
+			}
+		});
+		ipcMain.on("noname:host-send", (event, id, data) => {
+			if (trusted(event)) hosts.get(event.sender.id)?.send(id, data);
+		});
+		ipcMain.on("noname:host-close", (event, id) => {
+			if (trusted(event)) hosts.get(event.sender.id)?.close(id);
+		});
+		ipcMain.handle("noname:exit", event => {
+			if (trusted(event)) BrowserWindow.fromWebContents(event.sender)?.close();
+		});
+
+		serverReady = true;
+		createWindow();
+		app.on("activate", () => {
+			if (BrowserWindow.getAllWindows().length === 0) {
+				createWindow();
+			}
+		});
+	})
+	.catch(error => {
+		dialog.showErrorBox("启动失败", String(error));
+		app.quit();
 	});
-});
 
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {

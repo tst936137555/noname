@@ -14,49 +14,36 @@ let fs: IosFileSystem;
 
 export function initializeIos(): { fs: MinimalFileSystem } {
 	fs = new IosFileSystem(registerPlugin<BundledFileSystem>("BundledFileSystem"));
-	try {
-		const folders = ["image/character", "audio/skill", "audio/die", "extension"];
-		for (const folder of folders) {
-			fs.createDir({ dir: folder }).catch(console.error);
-		}
-	} catch (error) {
-		console.warn("[mobile] 预建导入目录失败:", error);
-	}
 	return { fs };
 }
 
 export function attachIosFileSystem(game: any): void {
 	game.checkFile = function checkFile(fileName, callback, onerror) {
-		fs
-			.statEntry({ entryName: fileName })
+		fs.statEntry({ entryName: fileName })
 			.then(result => callback?.(toTriState(result.type, "file")))
 			.catch(error => callbackError(onerror, error));
 	};
 
 	game.checkDir = function checkDir(dir, callback, onerror) {
-		fs
-			.statEntry({ entryName: dir })
+		fs.statEntry({ entryName: dir })
 			.then(result => callback?.(toTriState(result.type, "directory")))
 			.catch(error => callbackError(onerror, error));
 	};
 
 	game.readFile = function readFile(fileName, callback = (_: any) => {}, onerror = () => {}) {
-		fs
-			.readFile({ fileName })
+		fs.readFile({ fileName })
 			.then(result => callback(typeof result.data === "string" ? base64ToArrayBuffer(result.data) : result.data))
 			.catch(error => callbackError(onerror, error));
 	};
 
 	game.readFileAsText = function readFileAsText(fileName, callback = (_: any) => {}, onerror = () => {}) {
-		fs
-			.readFileAsText({ fileName })
+		fs.readFileAsText({ fileName })
 			.then(result => callback(result.data))
 			.catch(error => callbackError(onerror, error));
 	};
 
 	game.writeFile = function writeFile(data, path, name, callback = () => {}) {
-		fs
-			.createDir({ dir: path })
+		fs.createDir({ dir: path })
 			.then(async () => {
 				await fs.writeFile({
 					path: joinFilePath(path, name),
@@ -67,8 +54,7 @@ export function attachIosFileSystem(game: any): void {
 	};
 
 	game.removeFile = function removeFile(fileName, callback = (_?: any) => {}, onerror = () => {}) {
-		fs
-			.removeFile({ fileName })
+		fs.removeFile({ fileName })
 			.then(() => callback())
 			.catch(error => {
 				callback(error);
@@ -77,8 +63,7 @@ export function attachIosFileSystem(game: any): void {
 	};
 
 	game.getFileList = function getFileList(dir, callback = (_folders: any, _files: any) => {}, onerror) {
-		fs
-			.getFileList({ dir })
+		fs.getFileList({ dir })
 			.then(result => callback(result.folders, result.files))
 			.catch(error => callbackError(onerror, error));
 	};
@@ -92,15 +77,13 @@ export function attachIosFileSystem(game: any): void {
 	};
 
 	game.createDir = function createDir(directory, successCallback = () => {}, errorCallback = console.error) {
-		fs
-			.createDir({ dir: directory })
+		fs.createDir({ dir: directory })
 			.then(() => successCallback())
 			.catch(error => callbackError(errorCallback, error));
 	};
 
 	game.removeDir = function removeDir(directory, successCallback = () => {}, errorCallback = console.error) {
-		fs
-			.removeDir({ dir: directory })
+		fs.removeDir({ dir: directory })
 			.then(() => successCallback())
 			.catch(error => callbackError(errorCallback, error));
 	};
@@ -117,6 +100,9 @@ class IosFileSystem implements MinimalFileSystem {
 
 	async readFile(options: { fileName: string }): Promise<{ data: string | ArrayBuffer }> {
 		const writablePath = this.normalizeSegments(options.fileName);
+		if ((await this.bundleFs.stat({ path: options.fileName })).type === "file") {
+			return { data: await this.readBundled(options.fileName) };
+		}
 
 		if (await this.exists(writablePath)) {
 			const result = await Filesystem.readFile({
@@ -131,6 +117,9 @@ class IosFileSystem implements MinimalFileSystem {
 
 	async readFileAsText(options: { fileName: string }): Promise<{ data: string }> {
 		const writablePath = this.normalizeSegments(options.fileName);
+		if ((await this.bundleFs.stat({ path: options.fileName })).type === "file") {
+			return { data: await this.readBundledText(options.fileName) };
+		}
 
 		if (await this.exists(writablePath)) {
 			const result = await Filesystem.readFile({
@@ -247,6 +236,7 @@ class IosFileSystem implements MinimalFileSystem {
 	}
 
 	private normalizeSegments(path: string): string {
+		if (typeof path !== "string" || path.includes("\0") || path.replace(/\\/g, "/").split("/").includes("..")) throw new Error("Invalid path");
 		return path
 			.replace(/\\/g, "/")
 			.split("/")
@@ -267,6 +257,8 @@ class IosFileSystem implements MinimalFileSystem {
 	}
 
 	private async resolveType(path: string): Promise<"file" | "directory" | "none"> {
+		const bundled = (await this.bundleFs.stat({ path })).type;
+		if (bundled !== "none") return bundled;
 		const writablePath = this.normalizeSegments(path);
 
 		const writableType = await this.statWritable(writablePath);

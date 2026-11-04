@@ -76,6 +76,19 @@ export class Card extends HTMLDivElement {
 			lib.setIntro(this);
 		}
 	}
+	/** 装备原牌和视为牌共用格式，避免装备入栏后被覆盖成无样式文字。 */
+	setEquipmentLabel(name, suit, number, viewAs = false) {
+		const suitNode = document.createElement("span");
+		suitNode.className = "equip-suit" + (lib.color.red.includes(suit) ? " red" : "");
+		suitNode.textContent = get.translation(suit);
+		const rankNode = document.createElement("span");
+		rankNode.className = "equip-rank";
+		rankNode.textContent = number;
+		const nameNode = document.createElement("span");
+		nameNode.className = "equip-name";
+		nameNode.textContent = viewAs ? `[${name}]` : name;
+		this.node.name2.replaceChildren(suitNode, rankNode, " ", nameNode);
+	}
 	/** @type { Record<string, HTMLDivElement> } */
 	// eslint-disable-next-line no-unreachable
 	node;
@@ -567,7 +580,7 @@ export class Card extends HTMLDivElement {
 		if (info.modinfo) {
 			this.node.info.innerHTML = info.modinfo;
 		} else {
-			this.node.info.innerHTML = get.translation(card[0]) + '<span style="font-family:xinwei"> </span><span style="font-family:xinwei">' + cardnum + "</span>";
+			this.node.info.innerHTML = '<span class="cardsuit">' + get.translation(card[0]) + '</span><span class="cardrank">' + cardnum + "</span>";
 		}
 		if (info.addinfo) {
 			if (!this.node.addinfo) {
@@ -578,9 +591,7 @@ export class Card extends HTMLDivElement {
 			this.node.addinfo.remove();
 			delete this.node.addinfo;
 		}
-		if (lib.color.red.includes(card[0])) {
-			this.node.info.classList.add("red");
-		}
+		this.node.info.classList.toggle("red", lib.color.red.includes(card[0]));
 		this.node.image.className = "image";
 		var name = get.translation(card[2]);
 		if (card[2] == "sha") {
@@ -599,13 +610,14 @@ export class Card extends HTMLDivElement {
 			name += "杀";
 		}
 		this.node.name.innerHTML = name;
+		this.node.name.classList.remove("long", "longlong");
 		if (name.length >= 5) {
 			this.node.name.classList.add("long");
 			if (name.length >= 7) {
 				this.node.name.classList.add("longlong");
 			}
 		}
-		this.node.name2.innerHTML = get.translation(card[0]) + cardnum + " " + name;
+		this.setEquipmentLabel(name, card[0], cardnum);
 		this.classList.add("card");
 		if (card[3]) {
 			let natures = get.natureList(card[3]);

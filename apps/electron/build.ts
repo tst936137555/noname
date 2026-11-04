@@ -1,5 +1,6 @@
 import { build as buildElectron, Platform, Arch, type PackagerOptions, type Configuration } from "electron-builder";
 import { build as buildVite } from "vite";
+import { gameVersion } from "../../scripts/lib/game-version.js";
 
 async function main(targets: PackagerOptions["targets"], config: Partial<Configuration> = {}) {
 	const appPaths = await buildElectron({
@@ -18,6 +19,7 @@ async function main(targets: PackagerOptions["targets"], config: Partial<Configu
 			],
 			extraMetadata: {
 				main: "app/main.js",
+				version: gameVersion,
 			},
 			...config,
 		},

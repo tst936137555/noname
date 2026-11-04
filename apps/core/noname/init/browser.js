@@ -9,6 +9,7 @@ import { FileSystem, FileSystemError, FileSystemErrorCode, installLegacyFileSyst
  */
 
 export default async function browserReady({ lib, game }) {
+	if (window.nonameDesktop?.host) lib.node = { bridge: true };
 	lib.path = (await import("path-browserify-esm")).default;
 	const adpt = new BrowserAdapter();
 	const fs = new FileSystem(adpt);
@@ -17,8 +18,9 @@ export default async function browserReady({ lib, game }) {
 		// 这里只探测 dev server 的连通性和响应格式；文件不存在会返回 null。
 		await fs.stat("noname.js");
 	} catch (e) {
-		console.error("文件读写函数初始化失败:", e);
-		return;
+		console.info("静态托管：使用浏览器存档与下载", e);
+		// No file API on ordinary static hosting; legacy optional config files are absent.
+		fs.stat = async () => null;
 	}
 	lib.fs = fs;
 	installLegacyFileSystemAPI(game, fs);
@@ -33,13 +35,16 @@ export default async function browserReady({ lib, game }) {
 		const downloadLink = document.createElement("a");
 		downloadLink.download = fileNameToSaveAs;
 		downloadLink.innerHTML = "Download File";
-		downloadLink.href = window.URL.createObjectURL(data);
+		const url = window.URL.createObjectURL(data);
+		downloadLink.href = url;
 		downloadLink.click();
+		setTimeout(() => URL.revokeObjectURL(url), 60000);
 	};
 
 	game.exit = function () {
 		window.onbeforeunload = null;
-		window.close();
+		if (window.nonameDesktop) window.nonameDesktop.exit();
+		else window.close();
 	};
 
 	game.open = function (url) {

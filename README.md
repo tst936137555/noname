@@ -1,75 +1,131 @@
-<h1 align="center">无名杀</h1>
+# 无名杀 · 精简版
 
-<p align="center">
-  <a href="https://github.com/libnoname/noname/actions/workflows/build.yml"><img alt="构建状态" src="https://img.shields.io/github/actions/workflow/status/libnoname/noname/build.yml?branch=main&style=flat-square"></a>
-  <a href="https://github.com/libnoname/noname/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/libnoname/noname?display_name=tag&style=flat-square"></a>
-  <a href="https://github.com/libnoname/noname/releases"><img alt="累计下载" src="https://img.shields.io/github/downloads/libnoname/noname/total?style=flat-square"></a>
-  <a href="https://github.com/libnoname/noname/graphs/contributors"><img alt="项目贡献者" src="https://img.shields.io/github/contributors/libnoname/noname?style=flat-square"></a>
-  <a href="./LICENSE"><img alt="许可证" src="https://img.shields.io/github/license/libnoname/noname?style=flat-square"></a>
-</p>
+基于 [libnoname/noname](https://github.com/libnoname/noname) 的浏览器卡牌游戏，使用 pnpm workspace 管理游戏核心、文件服务、联机服务和桌面／移动客户端。当前版本统一使用仓库内实现的十周年风格主题。
 
-## 项目使用约定
+## 保留的内容
 
-本项目基于 GPL 3.0 协议开源，使用此项目时请遵守开源协议。  
-除此外，希望你在使用代码时已经了解以下额外说明：
+- 模式：身份（默认八人）、国战、斗地主、单挑、对决（2v2、3v3、4v4）和联机。
+- 武将：标准、神话再临、经典神将、一将成名、界限突破、璀璨星河、系列专属、新一将成名、OL 专属、文德武备、门阀士族、群英荟萃、限定专属、移动版、始计篇、谋攻篇、兵势篇、联动卡和怀旧，共 19 包。
+- 卡牌：标准、军争、国战、应变篇、九变篇、用间篇、忠胆英杰、逐鹿天下和活动卡牌，共 9 包。
 
-1. 打包、二次分发 **请保留代码出处**：<https://github.com/libnoname/noname>
-2. 请不要用于商业用途。
+固定外观采用长布局、流沙牌背和玻璃体力条。扩展安装／开发入口、外观切换入口以及未保留模式、武将包和修仙牌包的源码已移除；共用图片、字体和音效继续保留。
 
-## 快速启动
+支持内容的唯一清单是 [product.js](apps/core/noname/util/product.js)。读取旧存档时会过滤不支持的内容、恢复固定外观，并将失效模式回退到身份模式；联网地址、昵称和保留模式的设置继续沿用。详细范围见[精简版说明](docs/精简版说明.md)。
 
-### 环境要求
+## 环境与启动
 
-> **提示：** 请参考 [本地文档](./docs/how-to-start.md) 或 [github文档](https://github.com/libnoname/noname/wiki/%E5%A6%82%E4%BD%95%E8%BF%90%E8%A1%8C%E6%97%A0%E5%90%8D%E6%9D%80%EF%BC%88%E7%A8%8B%E5%BA%8F%E5%91%98%E7%89%88%EF%BC%89) 配置环境。
+- Node.js：建议使用与 CI 一致的 24 版本。
+- pnpm：10 或 11；CI 使用 10。
+- 浏览器构建目标：Chromium 91 或更高、Safari 16.4 或更高；目前不支持 Firefox。请通过 HTTP 服务启动。
 
-- [Node.js](https://nodejs.org/) ^20.19.0 || >=22.12.0
-- [pnpm](https://pnpm.io/) >= 9
-- Webview: Chromium >= 91 || Safari >=16.4.0 (暂不支持Firefox)
-
-### 安装依赖
+在仓库根目录执行：
 
 ```bash
 pnpm install
-```
-
-### 启动
-
-```bash
 pnpm dev
 ```
 
----
+开发入口为 http://127.0.0.1:8081，文件服务监听 8089 端口。首次启动需自行确认游戏内 GPL 协议提示。
 
-贡献代码可阅读相关文档：
+启动时显示预加载进度条，先准备模式封面和固定界面图片、字体并进入模式选择。选择模式后加载包体和资料，再按顺序注册；武将立绘和语音继续按需加载。加载队列最多并发 4 个任务，每项任务有 60 秒超时与阶段计时；菜单按需创建，重开和录像保留直达流程。发行包不再注册即时编译 Service Worker 或为其刷新页面。
 
-[Git 下载安装指南](https://github.com/libnoname/noname/wiki/Git%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)
+文件服务仅提供静态资源和只读查询，存档写入 IndexedDB，导出由浏览器或客户端完成。普通静态 HTTP 托管也可启动。桌面端页面使用隔离沙盒；局域网建房通过主进程固定端口的受限消息桥保留。
 
-[Github 桌面版客户端使用入门](https://docs.github.com/zh/desktop/overview/getting-started-with-github-desktop)
+## 构建与运行发布包
 
-[如何提交代码到《无名杀》Github 仓库](https://github.com/libnoname/noname/wiki/%E5%A6%82%E4%BD%95%E6%8F%90%E4%BA%A4%E4%BB%A3%E7%A0%81%E5%88%B0%E3%80%8A%E6%97%A0%E5%90%8D%E6%9D%80%E3%80%8BGithub%E4%BB%93%E5%BA%93)
+```bash
+pnpm build
+pnpm serve
+```
 
-[《无名杀》项目 Pull Request 提交规范](https://github.com/libnoname/noname/wiki/%E3%80%8A%E6%97%A0%E5%90%8D%E6%9D%80%E3%80%8B%E9%A1%B9%E7%9B%AE-Pull-Request-%E6%8F%90%E4%BA%A4%E8%A7%84%E8%8C%83)
+完整发布包输出到根目录 `dist/`，包括游戏代码、保留包体的源码、图片、音效和文档。`pnpm serve` 在 8089 端口提供此目录；`pnpm start` 会先构建再启动服务。
 
-客户端下载戳这里：
+仅构建核心及其 workspace 依赖：
 
-安卓： <https://github.com/nonameShijian/noname-shijian-android/releases/tag/v1.6.8>
+```bash
+pnpm -F noname... build
+```
 
-PC:  <https://github.com/nonameShijian/noname/releases/tag/v1.75>
+该命令输出 `apps/core/dist/`，不会合并根目录发布包的图片和音效。
 
-网页端推荐使用 Chrome 系内核浏览器游玩，暂不支持 Firefox 浏览器
+`pnpm package` 会先构建，再将完整游戏复制到 `output/noname/`。所有发布渠道均提供全量包，包含图片、字体和音频，可独立运行；不再发布核心包、增量包或单独的资源包，iOS 包也保留全部立绘和语音。
 
-请尽量保证游玩的 Chrome 系浏览器或手机 Webview 的`内核版本大于等于91`
+游戏仅维护 `apps/core/package.json` 中的一个版本号。游戏界面、桌面安装包及 Android／iOS 包版本均从此处读取或在构建时同步；发布标签必须为对应的 `v版本号`。不再区分客户端版本与资源包版本。
 
----
+游戏内保留武将包、卡牌包管理及存档导入／导出，移除扩展安装／加载、在线升级、更新源设置、素材包导入和游戏文件管理。“其它 → 关于”只显示游戏版本及全量版说明。
 
-最近有一伙人号称是《无名杀十周年》的开发团队，宣称《无名杀十周年》“全新无名杀，比旧版拥有更多武将，兼容更多扩展”，实际上:
+## 多线程构建
 
-- 《无名杀十周年》（原《无名杀清瑶版》）由无名杀 v1.9.124 修改而来，属于无名杀的一种**Fork**，并非“全新无名杀”；且《无名杀十周年》开发团队**公然违反 GPL-3.0 协议**，详情请看[这里](https://github.com/github/dmca/blob/master/2023/09/2023-09-20-noname.md)、[这里](https://tieba.baidu.com/p/8623890806)以及[这里](https://tieba.baidu.com/p/8624582238)。
-- 《无名杀十周年》至今没有更新神典韦等新机制武将，且删除了部分无名杀的原创武将，导致《无名杀十周年》的武将数量远远不及无名杀前几个版本的武将数量；不仅如此，《无名杀十周年》自分裂后的部分武将源码依然来自无名杀和其他开发者开源的代码。
-- 《无名杀十周年》兼容扩展的方式是不更新本体数据，从而导致《无名杀十周年》仍然在用 1.9.124 版本的代码，无法兼容使用 1.10 以后功能的扩展；而且《无名杀十周年》开发团队在使用**大量**GPL-3.0 开源的代码后对生成产物进行了**混淆加密**，在**违反开源精神**的同时，也导致扩展稳定性极具下降，更容易出问题。
+workspace 依赖按顺序完成构建，避免共享类型声明在清理时产生冲突。核心先完成本体构建和静态复制，再使用 Node.js `worker_threads` 并行构建武将、模式和卡牌三个包体类别。各线程分别写入 `dist/character`、`dist/mode`、`dist/card`，全部成功后才写入构建信息并进入发布包合并阶段。
 
-《无名杀十周年》就是彻头彻尾的骗局，《无名杀十周年》的开发团队更是一群拿无名杀吸血的骗子，虽然号称“不忘初心”，却公然对最有资格论述无名杀创作初心的无名杀创始人进行侮辱谩骂，直接违背其制定的规则和开源精神，恶劣程度远超当初在多个无名杀社群“自立”的水叶之流。
+默认线程数为可用 CPU 并行数与 3 的较小值。`NONAME_BUILD_WORKERS` 可设置为正整数，最多使用 3 个线程；低内存环境可设为 1。任一线程失败会使构建失败、停止派发后续任务，并终止其余构建线程。
 
-先秦介子推曾言：“窃人之财，犹谓之盗，况贪天之功以为己力乎。”无名杀社区发展至今，正是因为有大量的开源代码进行参考，才能不断推陈出新。试想每个扩展开发者在成为一个扩展开发者之前，谁敢说没有大量参考社区内的源码？每个作品凝聚的都是大家的心血，而不是仅仅归属于个别人。我们相信：开放、共享、多元才是无名杀的初心，绝不是封闭、私藏与趋同。
+PowerShell：
 
-我们在此呼吁无名杀社区正确认识《无名杀十周年》开发团队的一些行为与做法，并希望《无名杀十周年》开发团队能反省迄今以来的所作所为。**自由开源**是无名杀社区的灵魂，希望各方都能够遵循这一精神。
+```powershell
+$env:NONAME_BUILD_WORKERS = "1"
+pnpm build
+Remove-Item Env:NONAME_BUILD_WORKERS
+```
+
+macOS / Linux：
+
+```bash
+NONAME_BUILD_WORKERS=1 pnpm build
+```
+
+收益取决于 CPU、内存和磁盘；游戏事件处理继续遵循原有执行顺序。发布渠道可通过 `NONAME_BUILD_CHANNEL` 设置为 `test`、`nightly` 或 `release`，另支持 `NONAME_BUILD_COMMIT` 和 `NONAME_BUILD_TIME`；结果写入 `game/build-info.json`。
+
+## 联机与客户端
+
+本地联机大厅：
+
+```bash
+pnpm -F @noname/server dev
+```
+
+默认端口为 8082，在游戏联机地址中填写 `localhost:8082`。可通过 `--port` 或 `PORT` 修改服务端口。
+
+桌面客户端在执行 `pnpm build` 后，可运行对应平台命令：
+
+```bash
+pnpm -F @noname/electron build:win
+pnpm -F @noname/electron build:mac
+pnpm -F @noname/electron build:linux
+```
+
+移动端构建和原生工具链要求见 [apps/mobile/README.md](apps/mobile/README.md)。
+
+## 目录
+
+| 路径                                     | 用途                                 |
+| ---------------------------------------- | ------------------------------------ |
+| `apps/core/noname/`                      | 引擎、界面、配置与启动流程           |
+| `apps/core/character/`、`card/`、`mode/` | 保留的武将包、卡牌包和模式           |
+| `apps/core/scripts/`                     | 核心构建、包体工作线程与资源清单工具 |
+| `packages/fs/`                           | 本地文件与静态资源服务               |
+| `packages/server/`                       | WebSocket 联机大厅                   |
+| `packages/jit/`                          | Service Worker 即时编译支持          |
+| `apps/electron/`、`apps/mobile/`         | 桌面与移动客户端                     |
+| `scripts/`                               | 开发入口、发布包合并和线程调度       |
+| `docs/`                                  | 引擎、技能与客户端开发文档           |
+
+## 检查与贡献
+
+```bash
+pnpm test
+pnpm lint
+pnpm check:types
+```
+
+测试覆盖配置迁移、内容清单、构建并发、发布失败保护，以及文件越界、联机鉴权、失败入房、事件清理和数据库事务完成时机。修改加载或构建流程后还应执行核心构建；实际对局、存档迁移和联机行为需要人工回归。
+
+- [工程修复说明](docs/工程修复说明.md)
+- [贡献指南](CONTRIBUTING.md)
+- [Async 技能指南](docs/async-guide.md)
+- [启动流程](docs/game-startup-flow.md)
+- [事件系统](docs/game-event/index.md)
+
+## 来源与许可
+
+本项目源自 [libnoname/noname](https://github.com/libnoname/noname)，保留原作者及贡献者署名。使用、修改与分发请遵守仓库中的 [GPL-3.0 许可证](LICENSE)，二次分发请保留上游出处。原项目使用约定同时要求不用于商业用途。

@@ -223,7 +223,6 @@ export const start = async (event, trigger, player) => {
 
 		game.prepareArena();
 		// game.delay();
-		game.showChangeLog();
 
 		if (_status.brawl && _status.brawl.submode) {
 			_status.mode = _status.brawl.submode;

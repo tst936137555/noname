@@ -27,7 +27,7 @@ export default {
 				game.switchMode(directstartmode);
 				return;
 			}
-			if (lib.node && window.require) {
+			if (lib.node && (window.require || window.nonameDesktop?.host)) {
 				ui.startServer = ui.create.system(
 					"启动服务器",
 					e => {

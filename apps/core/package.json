@@ -22,7 +22,6 @@
         "dev": "pnpm vite dev",
         "build": "tsx scripts/build.ts",
         "build:types": "tsc -p tsconfig.types.json",
-        "generateAsset": "tsx scripts/generateAsset.ts",
         "lint": "pnpm eslint noname/**",
         "lint:prettier": "pnpm prettier -c noname/**"
     },

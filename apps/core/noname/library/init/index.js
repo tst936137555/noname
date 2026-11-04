@@ -14,65 +14,8 @@ export class LibInit {
 	}
 
 	reset() {
-		if (window.inSplash) {
-			return;
-		}
-		if (window.resetExtension) {
-			if (confirm("游戏似乎未正常载入，有可能因为部分扩展未正常载入，或者因为部分扩展未载入完毕。\n是否禁用扩展并重新打开？")) {
-				window.resetExtension();
-				window.location.reload();
-			}
-		} else {
-			if (lib.device) {
-				if (navigator.notification) {
-					navigator.notification.confirm(
-						"游戏似乎未正常载入，是否重置游戏？",
-						function (index) {
-							if (index == 2) {
-								localStorage.removeItem("noname_inited");
-								window.location.reload();
-							} else if (index == 3) {
-								var noname_inited = localStorage.getItem("noname_inited");
-								var onlineKey = localStorage.getItem(lib.configprefix + "key");
-								localStorage.clear();
-								if (noname_inited) {
-									localStorage.setItem("noname_inited", noname_inited);
-								}
-								if (onlineKey) {
-									localStorage.setItem(lib.configprefix + "key", onlineKey);
-								}
-								if (indexedDB) {
-									indexedDB.deleteDatabase(lib.configprefix + "data");
-								}
-								setTimeout(function () {
-									window.location.reload();
-								}, 200);
-							}
-						},
-						"确认退出",
-						["取消", "重新下载", "重置设置"]
-					);
-				} else {
-					if (confirm("游戏似乎未正常载入，是否重置游戏？")) {
-						localStorage.removeItem("noname_inited");
-						window.location.reload();
-					}
-				}
-			} else {
-				if (confirm("游戏似乎未正常载入，是否重置游戏？")) {
-					var onlineKey = localStorage.getItem(lib.configprefix + "key");
-					localStorage.clear();
-					if (onlineKey) {
-						localStorage.setItem(lib.configprefix + "key", onlineKey);
-					}
-					if (indexedDB) {
-						indexedDB.deleteDatabase(lib.configprefix + "data");
-					}
-					setTimeout(function () {
-						window.location.reload();
-					}, 200);
-				}
-			}
+		if (!window.inSplash && confirm("游戏加载超时，是否重新载入？")) {
+			window.location.reload();
 		}
 	}
 
@@ -97,18 +40,6 @@ export class LibInit {
 		if (lib.onfree) {
 			clearTimeout(window.resetGameTimeout);
 			delete window.resetGameTimeout;
-			if (!game.syncMenu) {
-				delete window.resetExtension;
-				localStorage.removeItem(lib.configprefix + "disable_extension");
-			}
-
-			if (game.removeFile && lib.config.brokenFile.length) {
-				while (lib.config.brokenFile.length) {
-					game.removeFile(lib.config.brokenFile.shift());
-				}
-				game.saveConfigValue("brokenFile");
-			}
-
 			var onfree = lib.onfree;
 			delete lib.onfree;
 			var loop = function () {
@@ -118,9 +49,7 @@ export class LibInit {
 				}
 			};
 			setTimeout(loop, 500);
-			if (!_status.new_tutorial) {
-				game.saveConfig("menu_loadondemand", true, lib.config.mode);
-			}
+			game.saveConfig("menu_loadondemand", true, lib.config.mode);
 		}
 	}
 
@@ -131,7 +60,7 @@ export class LibInit {
 			var message;
 			try {
 				message = JSON.parse(messagestr);
-				if (!Array.isArray(message) || typeof lib.message.server[message[0]] !== "function") {
+				if (!Array.isArray(message) || typeof message[0] !== "string" || !Object.hasOwn(lib.message.server, message[0]) || typeof lib.message.server[message[0]] !== "function") {
 					throw new Error("err");
 				}
 				if (client.sandbox) {
@@ -151,7 +80,12 @@ export class LibInit {
 				console.log("invalid message: " + messagestr);
 				return;
 			}
-			lib.message.server[message.shift()].apply(client, message);
+			try {
+				lib.message.server[message.shift()].apply(client, message);
+			} catch (error) {
+				console.error(error);
+				ws.close();
+			}
 		});
 		ws.on("close", function () {
 			client.close();
@@ -269,7 +203,7 @@ export class LibInit {
 			}
 			sScriptURL = lib.assetURL + str.slice(6);
 		} else {
-			let url = get.url(master);
+			let url = new URL(lib.assetURL || "./", document.baseURI).href;
 			if (url[url.length - 1] != "/") {
 				url += "/";
 			}
@@ -336,7 +270,7 @@ export class LibInit {
 		ui.css.styles.sheet.insertRule("#arena .player .identity>div {font-family: " + (lib.config.identity_font || "huangcao") + ",xinwei}", 0);
 		ui.css.styles.sheet.insertRule(".button.character.newstyle>.identity {font-family: " + (lib.config.identity_font || "huangcao") + ",xinwei}", 0);
 		if (lib.config.cardtext_font && lib.config.cardtext_font != "default") {
-			ui.css.styles.sheet.insertRule(".card div:not(.info):not(.background) {font-family: " + lib.config.cardtext_font + ";}", 0);
+			ui.css.styles.sheet.insertRule(".card > .name {font-family: " + lib.config.cardtext_font + ",xinwei,serif;}", 0);
 		}
 		if (lib.config.global_font && lib.config.global_font != "default") {
 			ui.css.styles.sheet.insertRule("#window {font-family: " + lib.config.global_font + ",xinwei}", 0);

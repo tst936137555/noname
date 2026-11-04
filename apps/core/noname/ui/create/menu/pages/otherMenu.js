@@ -1,3 +1,4 @@
+import { diagnostics } from "@/util/diagnostics.js";
 import { menuContainer, menuxpages, menuUpdates, openMenu, clickToggle, clickSwitcher, clickContainer, clickMenuItem, createMenu, createConfig } from "../index.js";
 import { ui, game, get, ai, lib, _status } from "noname";
 import { createApp } from "vue";
@@ -153,32 +154,21 @@ export const otherMenu = function (/** @type { boolean | undefined } */ connectM
 		ui.click.menuTab("其它");
 		clickMode.call(ui.commandnode);
 	};
-	//更新菜单有本体函数赋值，就不要懒加载了
 	(function () {
-		var page = ui.create.div("");
-		var node = ui.create.div(".menubutton.large", "更新", start.firstChild, clickMode);
+		const page = ui.create.div(".menu-help");
+		const node = ui.create.div(".menubutton.large", "关于", start.firstChild, clickMode);
 		node.link = page;
-		page.classList.add("menu-help");
-		var ul = document.createElement("ul");
-		var li1 = document.createElement("li");
-		var li3 = document.createElement("li");
+		const ul = document.createElement("ul");
+		const version = document.createElement("li");
 		const buildLabel = formatBuildLabel(lib.buildInfo);
-		li1.textContent = `游戏版本：${lib.version}${buildLabel ? ` (${buildLabel})` : ""}`;
-		li3.innerHTML = "由于无名杀正在重构项目结构，在线更新暂时无法使用，请访问github主页获取最新版本。";
-
-		/** @type { HTMLParagraphElement } */
-		var updatepx = ui.create.node("p");
-		updatepx.style.whiteSpace = "nowrap";
-		updatepx.style.marginTop = "8px";
-		var buttonx = ui.create.node("button", "访问项目主页", function () {
-			window.open("https://github.com/libnoname/noname");
-		});
-		updatepx.appendChild(buttonx);
-
-		ul.appendChild(li1);
-		ul.appendChild(li3);
-		ul.appendChild(updatepx);
-		page.appendChild(ul);
+		version.textContent = `游戏版本：${lib.version}${buildLabel ? ` (${buildLabel})` : ""}`;
+		const distribution = document.createElement("li");
+		distribution.textContent = "全量版：游戏代码、图片、字体和音频随完整安装包提供。";
+		ul.append(version, distribution);
+		const exportDiagnostics = document.createElement("button");
+		exportDiagnostics.textContent = "导出诊断信息";
+		exportDiagnostics.onclick = () => game.export(diagnostics(lib), "noname-diagnostics.json");
+		page.append(ul, exportDiagnostics);
 	})();
 	(function () {
 		var norow2 = function () {

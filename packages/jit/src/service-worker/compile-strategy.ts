@@ -56,35 +56,6 @@ abstract class CompileStrategy implements BaseStrategy {
 	}
 }
 
-// /**
-//  * 将nodejs的模块编译为js module模块，是在html中使用了如下代码:
-//  * ```js
-//  * const builtinModules = require("module").builtinModules;
-//  * if (Array.isArray(builtinModules)) {
-//  * 	const importMap = {
-//  * 		imports: {},
-//  * 	};
-//  * 	for (const module of builtinModules) {
-//  * 		importMap.imports[module] = importMap.imports[`node:${module}`] =
-//  * 			`./noname-builtinModules/${module}`;
-//  * 	}
-//  * 	const im = document.createElement("script");
-//  * 	im.type = "importmap";
-//  * 	im.textContent = JSON.stringify(importMap);
-//  * 	document.currentScript.after(im);
-//  * }
-//  * ```
-//  */
-// export class BuiltinModuleStrategy implements BaseStrategy {
-// 	match(ctx: RequestContext): boolean {
-// 		return ctx.url.pathname.startsWith("/noname-builtinModules/");
-// 	}
-// 	async process(ctx: RequestContext): Promise<Response> {
-// 		const moduleName = ctx.request.url.replace(location.origin + "/noname-builtinModules/", "");
-// 		return getResponse(`const module = require('${moduleName}');\nexport default module;`);
-// 	}
-// }
-
 /**
  * 返回资源的原始内容字符串
  * ```js
@@ -175,8 +146,8 @@ export class TSStrategy extends CompileStrategy {
 		this.allowJs = allowJs;
 	}
 	match(ctx: RequestContext): boolean {
-		if(this.allowJs && ctx.url.pathname.endsWith(".js")) return true;
-		if (!ctx.url.pathname.endsWith(".ts") ) return false;
+		if (this.allowJs && ctx.url.pathname.endsWith(".js")) return true;
+		if (!ctx.url.pathname.endsWith(".ts")) return false;
 		if (ctx.url.pathname.endsWith(".d.ts")) return false;
 		if (ctx.request.headers.get("accept")?.includes("video/mp2t")) return false;
 		return true;
@@ -227,13 +198,7 @@ export class VueSFCStrategy extends CompileStrategy {
 		// console.log({ descriptor });
 		const url = new URL(ctx.request.url);
 
-		return getResponse(
-			[
-				...(await this.compileScript(url, descriptor, id)),
-				...this.compileTemplate(url, descriptor, id),
-				...this.compileStyle(url, descriptor, id),
-			].join("\n")
-		);
+		return getResponse([...(await this.compileScript(url, descriptor, id)), ...this.compileTemplate(url, descriptor, id), ...this.compileStyle(url, descriptor, id)].join("\n"));
 	}
 	async compileScript(url: URL, descriptor: sfc.SFCDescriptor, id: string): Promise<string[]> {
 		const scopeId = `data-v-${id}`;
@@ -257,17 +222,9 @@ export class VueSFCStrategy extends CompileStrategy {
 		this.cache.set(
 			`${url.origin}${url.pathname}?${scriptSearchParams.toString()}`,
 			// 重写 default
-			sfc
-				.rewriteDefault(
-					script.attrs && (await compile(script.content, `${url.origin}${url.pathname}?${scriptSearchParams.toString()}`)),
-					"__sfc_main__"
-				)
-				.replace(`const __sfc_main__`, `export const __sfc_main__`)
+			sfc.rewriteDefault(script.attrs && (await compile(script.content, `${url.origin}${url.pathname}?${scriptSearchParams.toString()}`)), "__sfc_main__").replace(`const __sfc_main__`, `export const __sfc_main__`)
 		);
-		return [
-			`import { __sfc_main__ } from '${url.origin + url.pathname + "?" + scriptSearchParams.toString()}'`,
-			`__sfc_main__.__scopeId = '${scopeId}'`,
-		];
+		return [`import { __sfc_main__ } from '${url.origin + url.pathname + "?" + scriptSearchParams.toString()}'`, `__sfc_main__.__scopeId = '${scopeId}'`];
 	}
 	compileTemplate(url: URL, descriptor: sfc.SFCDescriptor, id: string): string[] {
 		const scopeId = `data-v-${id}`;
@@ -291,11 +248,7 @@ export class VueSFCStrategy extends CompileStrategy {
 			// .replace(`function render(_ctx, _cache) {`, str => str + 'console.log(_ctx);')
 		);
 
-		return [
-			`import { render } from '${url.origin + url.pathname + "?" + templateSearchParams.toString()}'`,
-			`__sfc_main__.render = render;`,
-			`export default __sfc_main__;`,
-		];
+		return [`import { render } from '${url.origin + url.pathname + "?" + templateSearchParams.toString()}'`, `__sfc_main__.render = render;`, `export default __sfc_main__;`];
 	}
 	compileStyle(url: URL, descriptor: sfc.SFCDescriptor, id: string): string[] {
 		// 一个 Vue 文件可能有多个 style 标签

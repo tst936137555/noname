@@ -43,6 +43,8 @@ export class DefaultSplash implements IOnloadSplash {
 		node.delete(1000);
 
 		await new Promise<void>(resolve => this.clicked.listenTransition(resolve, 500));
+		this.app.unmount();
+		this.app = undefined;
 
 		return true;
 	}

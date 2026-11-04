@@ -501,7 +501,7 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	initIsolatedEnvironment();
 
 	// 不允许被远程代码访问的game函数
-	const ioFuncs = ["download", "readFile", "readFileAsText", "writeFile", "removeFile", "getFileList", "ensureDirectory", "createDir", "removeDir", "checkForUpdate", "checkForAssetUpdate", "importExtension", "export", "multiDownload2", "multiDownload", "fetch"];
+	const ioFuncs = ["download", "readFile", "readFileAsText", "writeFile", "removeFile", "getFileList", "ensureDirectory", "createDir", "removeDir", "export", "multiDownload2", "multiDownload", "fetch"];
 
 	const accessDenieds = [
 		...ioFuncs.map(n => game[n]).filter(Boolean),

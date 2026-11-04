@@ -1,18 +1,24 @@
+import { importSave, validateSave } from "@/util/save.js";
 /// <reference types="vite/client" />
+import gamePackage from "../../package.json";
 import { rootURL, lib, game, get, _status, ui, ai } from "noname";
+import { characterPacks, cardPacks, modes, simplifyConfig } from "@/util/product.js";
 import { userAgentLowerCase } from "@/util/index.js";
 import * as config from "@/util/config.js";
 import { setOnError } from "@/util/error.ts";
 import { security, initializeSandboxRealms } from "@/util/sandbox.js";
 import { CacheContext } from "@/library/cache/cacheContext.js";
-import { importCardPack, importCharacterPack, importExtension, importMode } from "./import.js";
-import { loadCard, loadCardPile, loadCharacter, loadExtension, loadMode, loadPlay } from "./loading.js";
+import { importCardPack, importCharacterPack, importMode } from "./import.js";
+import { loadCard, loadCardPile, loadCharacter, loadMode } from "./loading.js";
+import { hideStartupLoading, preloadFont, preloadImage, runStartupTasks, showStartupLoading, startupImages, updateStartupProgress, yieldToBrowser } from "./startup.js";
 
 // 无名杀，启动！
 export async function boot() {
+	updateStartupProgress(5, "正在读取游戏设置");
 	// 不想看，反正别动
-	if (typeof __dirname === "string" && __dirname.length) {
-		const dirsplit = __dirname.split("/");
+	const legacyDirectory = window.nonameDesktop?.legacyDirectory || (typeof __dirname === "string" ? __dirname : "");
+	if (legacyDirectory.length) {
+		const dirsplit = legacyDirectory.split("/");
 		for (let i = 0; i < dirsplit.length; i++) {
 			if (dirsplit[i]) {
 				const c = dirsplit[i][0];
@@ -26,7 +32,8 @@ export async function boot() {
 	// 设定游戏加载时间，超过时间未加载就提醒
 	const configLoadTime = parseInt(localStorage.getItem(lib.configprefix + "loadtime") || "10000");
 	// 现在不暴露到全局变量里了，直接传给onload
-	const resetGameTimeout = setTimeout(lib.init.reset, configLoadTime);
+	let resetGameTimeout = setTimeout(lib.init.reset, configLoadTime);
+	window.resetGameTimeout = resetGameTimeout;
 
 	setBackground();
 
@@ -40,6 +47,7 @@ export async function boot() {
 	setOnError({ lib, game, get, _status });
 
 	await loadConfig();
+	simplifyConfig(lib.config);
 
 	// 兼容原有鏖战布尔设置，保持原规则并正确显示新的选择菜单。
 	for (const mode of ["guozhan", "connect"]) {
@@ -69,6 +77,7 @@ export async function boot() {
 	await security.initSecurity({ lib, game, ui, get, ai, _status });
 
 	CacheContext.setProxy({ lib, game, get });
+	updateStartupProgress(12, "正在准备游戏界面");
 
 	const ua = userAgentLowerCase;
 	if ("ontouchstart" in document) {
@@ -89,7 +98,6 @@ export async function boot() {
 				if (ua.includes("iphone") || ua.includes("android")) {
 					game.saveConfig("phonelayout", true);
 				}
-				game.reload();
 			}
 		}
 	} else if (config.get("touchscreen")) {
@@ -118,20 +126,18 @@ export async function boot() {
 	const pack = window.noname_package;
 	delete window.noname_package;
 	for (const name in pack.character) {
+		if (!characterPacks.includes(name)) continue;
 		if (config.get("all").sgscharacters.includes(name) || config.get("hiddenCharacterPack").indexOf(name) == -1) {
 			config.get("all").characters.push(name);
 			lib.translate[name + "_character_config"] = pack.character[name];
 		}
 	}
 	for (const name in pack.card) {
+		if (!cardPacks.includes(name)) continue;
 		if (config.get("all").sgscards.includes(name) || config.get("hiddenCardPack").indexOf(name) == -1) {
 			config.get("all").cards.push(name);
 			lib.translate[name + "_card_config"] = pack.card[name];
 		}
-	}
-	for (const name in pack.play) {
-		config.get("all").plays.push(name);
-		lib.translate[name + "_play_config"] = pack.play[name];
 	}
 	for (const name in pack.submode) {
 		for (const j in pack.submode[name]) {
@@ -139,6 +145,7 @@ export async function boot() {
 		}
 	}
 	for (const name in pack.mode) {
+		if (!modes.includes(name)) continue;
 		if (config.get("hiddenModePack").includes(name)) continue;
 		config.get("all").mode.push(name);
 		lib.translate[name] = pack.mode[name];
@@ -195,7 +202,7 @@ export async function boot() {
 			appearenceConfig.identity_font.item[value] = font;
 			appearenceConfig.cardtext_font.item[value] = font;
 			appearenceConfig.global_font.item[value] = font;
-			fontSheet.insertRule(`@font-face {font-family: '${value}'; src: local('${font}'), url('${lib.assetURL}font/${value}.woff2');}`, 0);
+			fontSheet.insertRule(`@font-face {font-family: '${value}'; src: url('${lib.assetURL}font/${value}.woff2'); font-display: swap;}`, 0);
 			if (suitsFont) {
 				fontSheet.insertRule(`@font-face {font-family: '${value}'; src: local('${font}'), url('${lib.assetURL}font/suits.woff2');}`, 0);
 			}
@@ -219,58 +226,7 @@ export async function boot() {
 		lib.init.background();
 		delete _status.htmlbg;
 	}
-	if (config.get("extension_sources")) {
-		for (const name in config.get("extension_sources")) {
-			lib.configMenu.general.config.extension_source.item[name] = name;
-		}
-	}
-
-	// 无名杀更新日志
-	await lib.init.promises.js("game", "update");
-	if (window.noname_update) {
-		lib.version = window.noname_update.version;
-		// 更全面的更新内容
-		if (config.get(`version_description_v${window.noname_update.version}`)) {
-			try {
-				const description = config.get(`version_description_v${window.noname_update.version}`);
-				const html = String.raw;
-				// 匹配[xx](url)的格式
-				const regex = /\[([^\]]*)\]\(([^)]+)\)/g;
-				lib.changeLog.push(
-					html`
-						<div
-							style="
-							position:relative;
-							width:50px;
-							height:50px;
-							border-radius:50px;
-							background-image:url('${description.author.avatar_url}');
-							background-size:cover;
-							vertical-align:middle;"
-						></div>
-						${description.author.login}于${description.published_at}发布
-					`.trim(),
-					description.body.replaceAll("\n", "<br/>").replace(regex, function (match, text, url) {
-						return `<a href="${url}">${text}</a>`;
-					})
-				);
-			} catch (e) {
-				console.error(e);
-				lib.changeLog.push(...window.noname_update.changeLog);
-			}
-		}
-		// 原更新内容
-		else {
-			lib.changeLog.push(...window.noname_update.changeLog);
-		}
-		if (window.noname_update.players) {
-			lib.changeLog.push("players://" + JSON.stringify(window.noname_update.players));
-		}
-		if (window.noname_update.cards) {
-			lib.changeLog.push("cards://" + JSON.stringify(window.noname_update.cards));
-		}
-		delete window.noname_update;
-	}
+	lib.version = gamePackage.version;
 
 	// 虽然但是，我就暴露个import，应该没啥问题
 	window.game = {
@@ -303,19 +259,6 @@ export async function boot() {
 		}
 	});
 
-	const extensionlist = await getExtensionList();
-	if (extensionlist.length) {
-		_status.extensionLoading = [];
-		_status.extensionLoaded = [];
-		for (const i of extensionlist) {
-			await importExtension(i);
-		}
-		if (_status.extensionLoading) {
-			await Promise.all(_status.extensionLoading);
-		}
-		delete _status.extensionLoading;
-	}
-
 	if (Array.isArray(lib.onprepare) && lib.onprepare.length) {
 		_status.onprepare = Object.freeze(
 			lib.onprepare.map(fn => {
@@ -325,39 +268,53 @@ export async function boot() {
 		);
 	}
 
-	const toLoad: Promise<any>[] = [];
+	const contentTasks: { label: string; load: () => Promise<any>; optional?: boolean }[] = [];
+	const toLoad: { label: string; load: () => Promise<any>; optional?: boolean }[] = [];
 
-	let show_splash;
-	switch (config.get("show_splash")) {
-		case "off":
-			show_splash = false;
-			break;
-		case "init":
-			show_splash = !localStorage.getItem("show_splash_off");
-			break;
-		case "always":
-			show_splash = true;
-			break;
-	}
+	// 普通启动总是先进入模式选择；游戏内重开和录像播放仍走原有直达流程。
+	const directStart = localStorage.getItem(`${lib.configprefix}directstart`) || localStorage.getItem("show_splash_off");
 	localStorage.removeItem("show_splash_off");
 
 	if (localStorage.getItem(`${lib.configprefix}playback`)) {
-		toLoad.push(importMode(config.get("mode")));
-	} else if ((localStorage.getItem(`${lib.configprefix}directstart`) || !show_splash) && config.get("all").mode.includes(config.get("mode"))) {
-		toLoad.push(importMode(config.get("mode")));
+		toLoad.push({ label: "录像模式", load: () => importMode(config.get("mode")) });
+	} else if (directStart && config.get("all").mode.includes(config.get("mode"))) {
+		toLoad.push({ label: "当前模式", load: () => importMode(config.get("mode")) });
+	} else {
+		for (const mode of config.get("all").mode) {
+			// Mode modules load only after selection.
+			toLoad.push({ label: `${get.translation(mode)}封面`, load: () => preloadImage(`${lib.assetURL}image/splash/style1/${mode}.jpg`), optional: true });
+		}
 	}
 
 	for (const cardPack of config.get("all").cards) {
-		toLoad.push(importCardPack(cardPack));
+		contentTasks.push({ label: `${get.translation(cardPack + "_card_config")}卡牌包`, load: () => importCardPack(cardPack) });
 	}
 	for (const characterPack of config.get("all").characters) {
-		toLoad.push(importCharacterPack(characterPack));
+		contentTasks.push({ label: `${get.translation(characterPack + "_character_config")}武将包`, load: () => importCharacterPack(characterPack) });
 	}
-	toLoad.push(lib.init.promises.js(`${lib.assetURL}character`, "rank"));
-	toLoad.push(lib.init.promises.js(`${lib.assetURL}character`, "replace"));
-	toLoad.push(lib.init.promises.js(`${lib.assetURL}character`, "perfectPairs"));
+	for (const name of ["rank", "replace", "perfectPairs"]) {
+		contentTasks.push({ label: "武将资料", load: () => lib.init.promises.js(`${lib.assetURL}character`, name) });
+	}
+	for (const path of startupImages) {
+		toLoad.push({ label: "界面素材", load: () => preloadImage(lib.assetURL + path), optional: true });
+	}
+	for (const font of ["xinwei", "huangcao", "NonameSuits"]) {
+		toLoad.push({ label: "界面字体", load: () => preloadFont(font), optional: true });
+	}
 
-	await Promise.allSettled(toLoad);
+	// 有任务完成就刷新超时计时，避免慢设备在正常预加载时被反复要求重启。
+	const refreshLoadTimeout = () => {
+		clearTimeout(resetGameTimeout);
+		resetGameTimeout = setTimeout(lib.init.reset, Math.max(configLoadTime, 30000));
+		window.resetGameTimeout = resetGameTimeout;
+	};
+	refreshLoadTimeout();
+	updateStartupProgress(18, "正在预加载游戏内容");
+	await yieldToBrowser();
+	await runStartupTasks(toLoad, (completed, total, label) => {
+		updateStartupProgress(18 + (completed / total) * 72, `正在预加载：${label}（${completed}/${total}）`);
+		refreshLoadTimeout();
+	});
 
 	if (_status.importing) {
 		let promises = [];
@@ -380,6 +337,7 @@ export async function boot() {
 	}
 
 	await createBackground();
+	updateStartupProgress(94, "正在整理界面资源");
 
 	if (lib.config.touchscreen) {
 		createTouchDraggedFilter();
@@ -470,6 +428,9 @@ export async function boot() {
 	lib.onloadSplashes.forEach(splash => {
 		lib.configMenu.appearence.config.splash_style.item[splash.id] = splash.name;
 	});
+	await Promise.allSettled(loadingCustomStyle);
+	updateStartupProgress(100, "预加载完成");
+	await yieldToBrowser();
 
 	localStorage.removeItem(lib.configprefix + "directstart");
 	if (!lib.imported.mode?.[lib.config.mode]) {
@@ -488,6 +449,7 @@ export async function boot() {
 
 		let { promise, resolve } = Promise.withResolvers();
 		await splash.init(node, resolve);
+		hideStartupLoading();
 
 		let result = await promise;
 
@@ -495,18 +457,22 @@ export async function boot() {
 		if (!splashInRemoing) {
 			node.remove();
 		}
-		window.resetGameTimeout = setTimeout(lib.init.reset, 10000);
+		refreshLoadTimeout();
 		delete window.inSplash;
+		showStartupLoading("正在准备所选模式");
 		game.saveConfig("mode", result);
 		await importMode(result);
 	}
+	await runStartupTasks(contentTasks, (completed, total, label) => {
+		updateStartupProgress((completed / total) * 90, `正在准备：${label}`);
+		refreshLoadTimeout();
+	});
 	lib.storage = (await config.load(lib.config.mode, "data")) || {};
 
 	const libOnload2 = lib.onload2;
 	delete lib.onload2;
 	libOnload2.forEach(fn => fn());
 
-	await Promise.allSettled(loadingCustomStyle);
 	delete window.game;
 
 	lib.connectCharacterPack = [];
@@ -518,15 +484,10 @@ export async function boot() {
 	lib.init.start = currentMode.start;
 	lib.init.startBefore = currentMode.startBefore;
 
-	if (lib.imported.character != null) {
-		Object.values(lib.imported.character).forEach(loadCharacter);
-	}
-
-	loadCardPile();
-
-	if (lib.imported.card != null) {
-		Object.values(lib.imported.card).forEach(loadCard);
-	}
+	// 包体注册必须按顺序进行；分批执行避免长时间占用主线程。
+	const registration = [...Object.values(lib.imported.character || {}).map(character => ({ label: "武将数据", load: async () => loadCharacter(character) })), { label: "牌堆", load: async () => loadCardPile() }, ...Object.values(lib.imported.card || {}).map(card => ({ label: "卡牌数据", load: async () => loadCard(card) }))];
+	updateStartupProgress(5, "正在准备对局数据");
+	await runStartupTasks(registration, (completed, total, label) => updateStartupProgress(5 + (completed / total) * 85, `正在准备${label}`), 1);
 
 	if (lib.cardPack.mode_derivation) {
 		lib.cardPack.mode_derivation = lib.cardPack.mode_derivation.filter(item => {
@@ -544,10 +505,6 @@ export async function boot() {
 	if (lib.config.mode === "connect") {
 		_status.connectMode = true;
 	} else {
-		if (lib.imported.play != null) {
-			Object.values(lib.imported.play).forEach(loadPlay);
-		}
-
 		lib.card.list = lib.card.list.filter(cardData => {
 			if (!cardData[2]) {
 				return false;
@@ -583,90 +540,23 @@ export async function boot() {
 		}
 	}
 
-	if (Array.isArray(lib.extensions)) {
-		await Promise.allSettled(lib.extensions.map(loadExtension));
-	}
-
 	if (lib.init.startBefore) {
 		lib.init.startBefore();
 		delete lib.init.startBefore;
 	}
 
+	updateStartupProgress(95, "正在创建游戏界面");
+	await yieldToBrowser();
 	ui.create.arena();
 	game.createEvent("game", false).setContent(lib.init.start);
-	if (lib.mode[lib.config.mode] && lib.mode[lib.config.mode].fromextension) {
-		const startstr = currentMode.start.toString();
-		if (startstr.indexOf("onfree") === -1) {
-			setTimeout(lib.init.onfree, 500);
-		}
-	}
 	delete lib.init.start;
 	if (Array.isArray(_status.onprepare) && _status.onprepare.length) {
 		await Promise.allSettled(_status.onprepare);
 		delete _status.onprepare;
 	}
 
+	hideStartupLoading();
 	game.loop();
-}
-
-async function getExtensionList() {
-	if (localStorage.getItem(lib.configprefix + "disable_extension")) return [];
-
-	const autoImport = (() => {
-		if (!config.get("extension_auto_import")) {
-			return false;
-		} else if (!(typeof game.getFileList == "function" && typeof game.checkFile == "function")) {
-			console.warn("没有文件系统操作权限，无法自动导入扩展。");
-			return false;
-		}
-		return true;
-	})();
-	const searchParamsImportExtension = new URLSearchParams(location.search).get("importExtensionName");
-
-	window.resetExtension = () => {
-		for (let ext of config.get("extensions")) {
-			game.promises.saveConfig(`extension_${ext}_enable`, false);
-		}
-		localStorage.setItem(lib.configprefix + "disable_extension", String(true));
-	};
-
-	const extensions: string[] = config.get("extensions");
-	const toLoad: string[] = [];
-	toLoad.addArray(config.get("plays").filter(i => config.get("all").plays.includes(i)));
-	toLoad.addArray(extensions);
-
-	if (autoImport) {
-		const extensionPath = new URL("./extension/", rootURL);
-		const [extFolders] = await game.promises.getFileList(get.relativePath(extensionPath));
-
-		const unimportedExtensions = extFolders.filter(folder => !extensions.includes(folder) && !config.get("all").plays.includes(folder));
-
-		const promises = unimportedExtensions.map(async ext => {
-			const path = new URL(`./${ext}/`, extensionPath);
-			const file = new URL("./extension.js", path);
-			const tsFile = new URL("./extension.ts", path);
-
-			if ((await game.promises.checkFile(get.relativePath(file))) == 1 || (await game.promises.checkFile(get.relativePath(tsFile))) == 1) {
-				extensions.push(ext);
-				toLoad.push(ext);
-				if (!config.has(`extension_${ext}_enable`)) {
-					await game.promises.saveConfig(`extension_${ext}_enable`, false);
-				}
-			}
-		});
-		await Promise.allSettled(promises);
-
-		await game.promises.saveConfig("extensions", extensions);
-	} else if (searchParamsImportExtension) {
-		extensions.push(searchParamsImportExtension);
-		toLoad.push(searchParamsImportExtension);
-		if (!config.has(`extension_${searchParamsImportExtension}_enable`)) {
-			await game.promises.saveConfig(`extension_${searchParamsImportExtension}_enable`, true);
-		}
-		await game.promises.saveConfig("extensions", extensions);
-	}
-
-	return toLoad;
 }
 
 function initSheet() {
@@ -792,8 +682,12 @@ async function loadConfig() {
 
 	const event = await new Promise<Event>((resolve, reject) => {
 		const idbOpenDBRequest = window.indexedDB.open(`${lib.configprefix}data`, 4);
-		idbOpenDBRequest.onerror = reject;
-		idbOpenDBRequest.onsuccess = resolve;
+		idbOpenDBRequest.onerror = () => reject(idbOpenDBRequest.error);
+		idbOpenDBRequest.onblocked = () => reject(new Error("数据库升级被其他窗口阻塞，请关闭其他游戏窗口后重试"));
+		idbOpenDBRequest.onsuccess = event => {
+			idbOpenDBRequest.result.onversionchange = () => idbOpenDBRequest.result.close();
+			resolve(event);
+		};
 		idbOpenDBRequest.onupgradeneeded = idbVersionChangeEvent => {
 			// @ts-expect-error MaybeHave
 			const idbDatabase = idbVersionChangeEvent.target.result;
@@ -824,23 +718,33 @@ async function loadConfig() {
 		try {
 			const configStr = await game.promises.readFileAsText("noname.config.txt");
 
-			let data;
-			({ config: result = {}, data = {} } = JSON.parse(lib.init.decode(configStr)));
-			for (let i in result) {
-				game.saveConfig(i, result[i]);
+			const save = validateSave(JSON.parse(lib.init.decode(configStr)));
+			const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(configStr))), byte => byte.toString(16).padStart(2, "0")).join("");
+			const marker = lib.configprefix + "legacy_config_import";
+			if (localStorage.getItem(marker) !== hash) {
+				await importSave(lib.db, save);
+				localStorage.setItem(marker, hash);
 			}
-			for (let i in data) {
-				game.putDB("data", i, data[i]);
-			}
+			result = await game.getDB("config");
 		} catch (e) {
 			console.error(e);
 			result = {};
 		}
 		lib.init.background();
-		await game.promises.removeFile("noname.config.txt").catch(e => console.error(e));
 	} else {
 		result = await game.getDB("config");
 	}
+
+	if (!result || typeof result !== "object" || Array.isArray(result)) result = {};
+	for (const [key, expected] of Object.entries(lib.config)) {
+		if (!(key in result) || expected === null) continue;
+		const value = result[key];
+		if (Array.isArray(expected) ? !Array.isArray(value) : typeof expected === "object" ? !value || typeof value !== "object" || Array.isArray(value) : typeof value !== typeof expected) delete result[key];
+	}
+	const restored = { ...lib.config, ...result };
+	simplifyConfig(restored);
+	result = { ...result, mode: restored.mode, mode_config: restored.mode_config, all: restored.all, characters: restored.characters, cards: restored.cards };
+	for (const key of ["__proto__", "constructor", "prototype"]) delete result[key];
 
 	// 读取模式
 	if (result.mode) {
@@ -901,7 +805,7 @@ async function loadCss() {
 }
 
 function setBackground() {
-	let htmlbg = localStorage.getItem(lib.configprefix + "background");
+	let htmlbg = "ol_bg";
 	if (htmlbg) {
 		if (htmlbg[0] == "[") {
 			try {

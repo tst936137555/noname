@@ -2,7 +2,6 @@ import { lib, game, get, _status, ai, ui } from "noname";
 import { menu } from "./menu/index.js";
 import { cardPackMenu } from "./menu/pages/cardPackMenu.js";
 import { characterPackMenu } from "./menu/pages/characterPackMenu.js";
-import { extensionMenu } from "./menu/pages/exetensionMenu.js";
 import { optionsMenu } from "./menu/pages/optionsMenu.js";
 import { otherMenu } from "./menu/pages/otherMenu.js";
 import { startMenu } from "./menu/pages/startMenu.js";
@@ -883,8 +882,6 @@ export class Create {
 	characterPackMenu = characterPackMenu;
 	/** 创建“卡牌”菜单 */
 	cardPackMenu = cardPackMenu;
-	/** 创建“扩展”菜单 */
-	extensionMenu = extensionMenu;
 	/** 创建“其他”菜单 */
 	otherMenu = otherMenu;
 	statictable() {
@@ -2417,7 +2414,6 @@ export class Create {
 		}
 		lib.init.js(lib.assetURL + "game", "keyWords", function () {});
 
-		lib.updateURL = lib.updateURLS[lib.config.update_link] || lib.updateURLS.coding;
 
 		lib.init.cssstyles();
 
@@ -3137,38 +3133,6 @@ export class Create {
 			lib.arenaReady?.shift()();
 		}
 		delete lib.arenaReady;
-		/*if (lib.config.auto_check_update && !sessionStorage.getItem("auto_check_update")) {
-			setTimeout(() => {
-				sessionStorage.setItem("auto_check_update", "1");
-				game.checkForUpdate(false);
-			}, 3000);
-		}
-		if (!lib.config.asset_version) {
-			lib.onfree.push(function () {
-				setTimeout(function () {
-					if (!game.download) {
-						game.saveConfig("asset_version", "无");
-					} else {
-						var func = function () {
-							if (confirm("是否下载图片和字体素材？")) {
-								if (!ui.arena.classList.contains("menupaused")) {
-									ui.click.configMenu();
-									ui.click.menuTab("其它");
-								}
-								setTimeout(game.checkForAssetUpdate, 500);
-							} else {
-								game.saveConfig("asset_version", "无");
-							}
-						};
-						// if (_status.new_tutorial) {
-						// 	_status.new_tutorial = func;
-						// } else {
-						// 	func();
-						// }
-					}
-				}, 3000);
-			});
-		}*/
 		if (localStorage.getItem(lib.configprefix + "playback")) {
 			setTimeout(lib.init.onfree);
 		}

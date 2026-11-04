@@ -1,5 +1,5 @@
 <template>
-	<div class="hidden" v-for="(mode, index) in lib.config.all.mode" :key="mode" :link="mode" :index="index" ref="nodeList">
+	<div class="hidden" v-for="(mode, index) in lib.config.all.mode" :key="mode" :link="mode" :index="index" ref="nodeList" role="button" tabindex="0" :aria-label="get.translation(mode)" @keydown.enter="activate(mode, $event.currentTarget as HTMLElement)" @keydown.space.prevent="activate(mode, $event.currentTarget as HTMLElement)">
 		<div class="splashtext">
 			{{ get.verticalStr(get.translation(mode)) }}
 		</div>
@@ -21,18 +21,18 @@ const props = defineProps<Props>();
 
 const nodeList = ref<HTMLElement[]>([]);
 let clicked = false;
+function activate(mode: string, node: HTMLElement) {
+	if (clicked) return;
+	clicked = true;
+	props.click(mode, node);
+}
 
 onMounted(() => {
 	nodeList.value.forEach(async (node: HTMLElement) => {
 		const mode = node.getAttribute("link") as string;
 		const index = parseInt(node.getAttribute("index") || "0");
 
-		(node as any).listen(() => {
-			if (!clicked) {
-				clicked = true;
-				props.click(mode, node);
-			}
-		});
+		(node as any).listen(() => activate(mode, node));
 
 		const avatar = node.querySelector(".avatar") as any;
 

@@ -1541,17 +1541,6 @@ export class Get {
 		}
 		return `###${str}###${lib.translate[`${skill}_info`]}`;
 	}
-	url(master) {
-		var url = lib.config.updateURL || lib.updateURL;
-		if (url[url.length - 1] != "/") {
-			url += "/";
-		}
-		if (master != "nodev") {
-			return url + "master/";
-		} else {
-			return url + "v" + lib.version + "/";
-		}
-	}
 	round(num, f) {
 		var round = Math.pow(10, f);
 		return Math.round(num * round) / round;
@@ -1894,7 +1883,8 @@ export class Get {
 		return list;
 	}
 	ip() {
-		if (!require) {
+		if (window.nonameDesktop?.host) return window.nonameDesktop.host.ip;
+		if (typeof require !== "function") {
 			return "";
 		}
 		var interfaces = require("os").networkInterfaces();

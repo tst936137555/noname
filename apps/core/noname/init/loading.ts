@@ -3,7 +3,7 @@
  */
 
 import { lib, game, get, _status, ui, ai } from "noname";
-import { isClass } from "@/util/index.js";
+import { characterPacks, modes } from "@/util/product.js";
 
 /**
  * 读取导入的卡牌包信息
@@ -117,6 +117,7 @@ export function loadCardPile() {
  */
 export function loadCharacter(character: importCharacterConfig) {
 	let name = character.name;
+	if (!characterPacks.includes(name)) return;
 
 	if (character.character) {
 		const characterPack = lib.characterPack[name];
@@ -142,14 +143,7 @@ export function loadCharacter(character: importCharacterConfig) {
 				break;
 			case "character":
 				if (!lib.config.characters.includes(name) && lib.config.mode !== "connect") {
-					if (lib.config.mode === "chess" && get.config("chess_mode") === "leader" && get.config("chess_leader_allcharacter")) {
-						for (const charaName in value) {
-							// @ts-expect-error ignore
-							lib.hiddenCharacters.push(charaName);
-						}
-					} else if (lib.config.mode !== "boss" || name !== "boss") {
-						break;
-					}
+					break;
 				}
 			// [falls through]
 			default:
@@ -228,191 +222,11 @@ export function loadCharacter(character: importCharacterConfig) {
 	}
 }
 
-export async function loadExtension(extension) {
-	if (!extension[5] && lib.config.mode === "connect") {
-		return;
-	}
-
-	try {
-		_status.extension = extension[0];
-		_status.evaluatingExtension = extension[3];
-		if (typeof extension[1] == "function") {
-			try {
-				await extension[1].call(extension, extension[2], extension[4]);
-			} catch (e) {
-				console.log(`加载《${extension[0]}》扩展的content时出现错误。`, e);
-				if (!lib.config.ignore_error) {
-					alert(`加载《${extension[0]}》扩展的content时出现错误。
-该错误本身可能并不影响扩展运行。您可以在“设置→通用→无视扩展报错”中关闭此弹窗。
-错误信息: 
-${e instanceof Error ? e.stack : String(e)}`);
-				}
-			}
-		}
-
-		if (extension[6]) {
-			if (isClass(extension[6])) {
-				const classInstance = new extension[6]();
-				const proto = Object.getPrototypeOf(classInstance);
-				const methods = Object.getOwnPropertyNames(proto).filter(methodName => typeof proto[methodName] === "function" && methodName !== "constructor"); //防止把他的属性加进去了喵
-
-				methods.forEach(methodName => {
-					lib.arenaReady?.push(proto[methodName].bind(classInstance));
-				});
-			} else {
-				lib.arenaReady?.push(extension[6]);
-			}
-		}
-		if (extension[4] && !extension[4].nopack) {
-			if (typeof extension[4].character?.character == "object" && Object.keys(extension[4].character.character).length > 0) {
-				const content = { ...extension[4].character };
-				content.name = extension[0];
-				content.translate ??= {};
-				content.translate[content.name] ??= extension[0];
-
-				// ~~到最后，还得遍历一遍~~
-				// 我就是被拷打，成为新的1103，受到白鼠群的嘲笑谩骂，我也绝不再次遍历！
-				if (content.mode === "guozhan") {
-					lib.characterGuozhanFilter.add(content.name);
-				}
-				for (const [charaName, character] of Object.entries(content.character)) {
-					if (lib.config[`forbidai_user_${content.name}`] || lib.config.forbidai_user?.includes(charaName)) {
-						lib.config.forbidai.add(charaName);
-					}
-					if (Array.isArray(character)) {
-						if (!character[4]) {
-							character[4] = [];
-						}
-
-						if (!character[4].some(str => typeof str == "string" && /^(?:db:extension-.+?|ext|img|character):.+/.test(str))) {
-							const img = extension[3] ? `db:extension-${extension[0]}:${charaName}.jpg` : `ext:${extension[0]}/${charaName}.jpg`;
-							character[4].add(img);
-						}
-						if (!character[4].some(str => typeof str == "string" && /^die:.+/.test(str))) {
-							const audio = `die:ext:${extension[0]}/${charaName}.mp3`;
-							character[4].add(audio);
-						}
-
-						if (character[4].includes("boss") || character[4].includes("hiddenboss")) {
-							lib.config.forbidai.add(charaName);
-						}
-						for (const skill of character[3]) {
-							lib.skilllist.add(skill);
-						}
-					} else {
-						if (!character.img) {
-							const characterImage = `extension/${extension[0]}/${charaName}.jpg`;
-							character.img = characterImage;
-						}
-						if (!character.dieAudios) {
-							character.dieAudios = [];
-							const characterDieAudio = `ext:${extension[0]}/${charaName}.mp3`;
-							character.dieAudios.push(characterDieAudio);
-						}
-						if (character.isBoss || character.isHiddenBoss) {
-							lib.config.forbidai.add(charaName);
-						}
-						if (character.skills) {
-							for (const skill of character.skills) {
-								lib.skilllist.add(skill);
-							}
-						}
-					}
-				}
-				if (typeof content.skill == "object") {
-					for (const skillInfo of Object.values(content.skill)) {
-						extSkillInject(extension[0], skillInfo);
-					}
-				}
-
-				if (lib.imported.character) {
-					lib.imported.character[extension[0]] = content;
-				}
-
-				if (!lib.config[`@Experimental.extension.${extension[0]}.character`]) {
-					game.saveConfig(`@Experimental.extension.${extension[0]}.character`, true);
-					lib.config.characters.add(extension[0]);
-					await game.promises.saveConfigValue("characters");
-				}
-
-				loadCharacter(content);
-			}
-			if (typeof extension[4].card?.card == "object" && Object.keys(extension[4].card.card).length > 0) {
-				const content = { ...extension[4].card };
-				content.name = extension[0];
-				content.translate ??= {};
-				content.translate[content.name] ??= extension[0];
-
-				// ~~到最后，还得遍历一遍~~
-				// 我就是被拷打，成为新的1103，受到白鼠群的嘲笑谩骂，我也绝不再次遍历！
-				for (const [cardName, card] of Object.entries(content.card)) {
-					if (card.audio === true) {
-						card.audio = `ext:${extension[0]}`;
-					}
-					if (!card.image) {
-						if (card.fullskin || card.fullimage) {
-							const suffix = card.fullskin ? "png" : "jpg";
-
-							if (extension[3]) {
-								card.image = `db:extension-${extension[0]}:${cardName}.${suffix}`;
-							} else {
-								card.image = `ext:${extension[0]}/${cardName}.${suffix}`;
-							}
-						}
-					}
-				}
-				if (typeof content.skill == "object") {
-					for (const skillInfo of Object.values(content.skill)) {
-						extSkillInject(extension[0], skillInfo);
-					}
-				}
-
-				if (lib.imported.card) {
-					lib.imported.card[extension[0]] = content;
-				}
-
-				if (!lib.config[`@Experimental.extension.${extension[0]}.card`]) {
-					game.saveConfig(`@Experimental.extension.${extension[0]}.card`, true);
-					lib.config.cards.add(extension[0]);
-					await game.promises.saveConfigValue("cards");
-				}
-
-				loadCard(content);
-			}
-			if (typeof extension[4].skill?.skill == "object" && Object.keys(extension[4].skill.skill).length > 0) {
-				for (const [skillName, skillInfo] of Object.entries(extension[4].skill.skill)) {
-					if (lib.skill[skillName]) {
-						console.log(`duplicated skill in extension ${extension[0]}:\n${skillName}:\nlib.skill.${skillName}`, lib.skill[skillName], `\nextension.${extension[0]}.skill.skill.${skillName}`, skillInfo);
-						continue;
-					}
-
-					extSkillInject(extension[0], skillInfo);
-					lib.skill[skillName] = skillInfo;
-				}
-
-				if (typeof extension[4].skill.translate == "object") {
-					for (const [transName, translate] of Object.entries(extension[4].skill.translate)) {
-						if (lib.translate[transName]) {
-							console.log(`duplicated translate in extension ${extension[0]}:\n${transName}:\nlib.translate.${transName}`, lib.translate[transName], `\nextension.${extension[0]}.skill.translate.${transName}`, translate);
-							continue;
-						}
-
-						lib.translate[transName] = translate;
-					}
-				}
-			}
-		}
-		delete _status.extension;
-		delete _status.evaluatingExtension;
-	} catch (e) {
-		console.error(e);
-	}
-}
-
 /**
  * 读取当前的模式信息
  */
 export function loadMode(mode: importModeConfig) {
+	if (!modes.includes(mode.name)) throw new Error(`精简版不支持此模式：${mode.name}`);
 	mixinLibrary(mode, lib);
 	mixinGeneral(mode, "game", game);
 	mixinGeneral(mode, "ui", ui);
@@ -432,72 +246,12 @@ export function loadMode(mode: importModeConfig) {
 }
 
 /**
- * 读取导入的play信息
- */
-export function loadPlay(playConfig: importPlayConfig) {
-	const i = playConfig.name;
-
-	if (lib.config.hiddenPlayPack.includes(i)) {
-		return;
-	}
-	if (playConfig.forbid && playConfig.forbid.includes(lib.config.mode)) {
-		return;
-	}
-	if (playConfig.mode && !playConfig.mode.includes(lib.config.mode)) {
-		return;
-	}
-
-	// @ts-expect-error ignore
-	lib.element = mixinElement(playConfig, lib.element);
-	mixinGeneral(playConfig, "game", game);
-	mixinGeneral(playConfig, "ui", ui);
-	mixinGeneral(playConfig, "get", get);
-	for (const [configName, configItem] of Object.entries(playConfig)) {
-		switch (configName) {
-			case "name":
-			case "mode":
-			case "forbid":
-			case "init":
-			case "element":
-			case "game":
-			case "get":
-			case "ui":
-			case "arenaReady":
-				break;
-			default:
-				for (const [itemName, item] of Object.entries(configItem)) {
-					if (configName !== "translate" || itemName !== i) {
-						if (lib[configName][itemName] != null) {
-							console.log(`duplicated ${configName} in play ${i}:\n${itemName}:\nlib.${configName}.${itemName}`, lib[configName][itemName], `\nplay.${i}.${configName}.${itemName}`, item);
-						}
-						lib[configName][itemName] = item;
-					}
-				}
-				break;
-		}
-	}
-
-	if (typeof playConfig.init == "function") {
-		playConfig.init();
-	}
-	if (typeof playConfig.arenaReady == "function") {
-		lib.arenaReady?.push(playConfig.arenaReady);
-	}
-}
-
-function extSkillInject(extName, skillInfo) {
-	if (typeof skillInfo.audio == "number" || typeof skillInfo.audio == "boolean") {
-		skillInfo.audio = `ext:${extName}:${Number(skillInfo.audio)}`;
-	}
-}
-
-/**
  * 通用形式的内容注入
  *
  * 由于历史原因，故直接覆盖对应的变量
  *
  * @template {Object} T
- * @param {importModeConfig | importPlayConfig} config
+ * @param {importModeConfig} config
  * @param {string} name
  * @param {T} where
  * @return {void}
@@ -529,7 +283,7 @@ function mixinGeneral(config, name, where) {
 /**
  * `lib`的内容注入
  *
- * @param {importModeConfig | importPlayConfig} config
+ * @param {importModeConfig} config
  * @param {Library} lib
  * @return {void}
  */
@@ -568,7 +322,7 @@ function mixinLibrary(config, lib) {
 /**
  * `lib.element`的内容注入
  *
- * @param {importModeConfig | importPlayConfig} config
+ * @param {importModeConfig} config
  * @param {Record<string, Object>} element
  * @return {Record<string, Object>}
  */

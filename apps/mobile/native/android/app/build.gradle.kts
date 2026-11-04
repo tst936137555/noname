@@ -1,4 +1,5 @@
 import java.util.Properties
+import groovy.json.JsonSlurper
 
 val signingProperties = Properties()
 val signingPropertiesFile = rootProject.file("keystore.properties")
@@ -26,6 +27,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Use the same game manifest as the web and desktop builds.
+val gameVersion = (JsonSlurper().parse(rootProject.file("../../../core/package.json")) as Map<*, *>)["version"] as String
+val gameVersionParts = gameVersion.split(".").map(String::toInt)
+require(gameVersionParts.size == 3 && gameVersionParts[1] in 0..999 && gameVersionParts[2] in 0..999)
+val gameVersionCode = gameVersionParts[0] * 1000000 + gameVersionParts[1] * 1000 + gameVersionParts[2]
+require(gameVersionCode in 1..2100000000)
+
 android {
     namespace = "com.libnoname.noname"
     compileSdk = rootProject.extra["compileSdkVersion"] as Int
@@ -34,8 +42,8 @@ android {
         applicationId = "com.libnoname.noname"
         minSdk = rootProject.extra["minSdkVersion"] as Int
         targetSdk = rootProject.extra["targetSdkVersion"] as Int
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = gameVersionCode
+        versionName = gameVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

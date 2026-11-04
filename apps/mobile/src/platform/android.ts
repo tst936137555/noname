@@ -25,15 +25,14 @@ let fs: SafFsPlugin;
 
 export async function initializeAndroid(): Promise<{ fs: MinimalFileSystem }> {
 	fs = registerPlugin<SafFsPlugin>("SafFs");
-	let access = await fs.hasAccess();
-	if (!access.granted) {
-		access = await fs.requestAccess();
-	}
-	if (!access.granted) {
-		throw new Error("未授权游戏目录");
-	}
 	// SafFs拥有方式then，直接返回会视为PromiseLike，得包一层
 	return { fs };
+}
+
+async function ensureWriteAccess(): Promise<void> {
+	let access = await fs.hasAccess();
+	if (!access.granted) access = await fs.requestAccess();
+	if (!access.granted) throw new Error("未授权导出目录");
 }
 
 export function attachAndroidFileSystem(game: any): void {
@@ -66,8 +65,8 @@ export function attachAndroidFileSystem(game: any): void {
 	};
 
 	game.writeFile = function writeFile(data, path, name, callback = () => {}) {
-		fs
-			.createDir({ dir: path })
+		ensureWriteAccess()
+			.then(() => fs.createDir({ dir: path }))
 			.then(async () => {
 				await fs.writeFile({
 					path: joinFilePath(path, name),
@@ -103,8 +102,8 @@ export function attachAndroidFileSystem(game: any): void {
 	};
 
 	game.createDir = function createDir(directory, successCallback = () => {}, errorCallback = console.error) {
-		fs
-			.createDir({ dir: directory })
+		ensureWriteAccess()
+			.then(() => fs.createDir({ dir: directory }))
 			.then(() => successCallback())
 			.catch(error => callbackError(errorCallback, error));
 	};

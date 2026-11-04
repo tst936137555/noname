@@ -1,5 +1,6 @@
 export interface ServerOptions {
 	port?: number;
+	host?: string;
 }
 
 export interface ServerInstance {

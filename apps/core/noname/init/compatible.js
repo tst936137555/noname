@@ -971,7 +971,7 @@ Object.assign(lib.init, {
 			}
 			sScriptURL = lib.assetURL + str.slice(6);
 		} else {
-			let url = get.url(master);
+			let url = new URL(lib.assetURL || "./", document.baseURI).href;
 			if (url[url.length - 1] != "/") {
 				url += "/";
 			}

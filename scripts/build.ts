@@ -1,25 +1,20 @@
+import { publishDirectory } from "./lib/distribution.js";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
-spawnSync("pnpm -F noname... build", {
+// Workspace declaration builds share the root tsconfig; finish dependencies in order.
+// The core build still parallelizes character, mode and card bundles.
+const coreBuild = spawnSync("pnpm -r --workspace-concurrency=1 -F noname... build", {
 	shell: true,
 	stdio: "inherit",
 });
 
-spawnSync("pnpm -F ./packages/extension/** build", {
-	shell: true,
-	stdio: "inherit",
-});
+if (coreBuild.error) throw coreBuild.error;
+if (coreBuild.status !== 0) process.exit(coreBuild.status ?? 1);
 
 console.log("合并打包结果");
-await fs.rm("dist", { recursive: true, force: true });
-await fs.mkdir("dist", { recursive: true });
-await Promise.all([
-	fs.cp("apps/core/dist", "dist", { recursive: true }),
-	fs.cp("apps/core/audio", "dist/audio", { recursive: true }),
-	fs.cp("apps/core/image", "dist/image", { recursive: true }),
-	fs.cp("apps/core/extension", "dist/extension", { recursive: true }),
-	fs.cp("docs", "dist/docs", { recursive: true }),
-	fs.cp(".nomedia", "dist/.nomedia"),
-	fs.cp("LICENSE", "dist/LICENSE"),
-	fs.cp("README.md", "dist/README.md")
-]);
+await publishDirectory("dist", async staging => {
+	const copies = await Promise.allSettled([fs.cp("apps/core/dist", staging, { recursive: true }), fs.cp("apps/core/audio", join(staging, "audio"), { recursive: true }), fs.cp("apps/core/image", join(staging, "image"), { recursive: true }), fs.cp("docs", join(staging, "docs"), { recursive: true }), ...[".nomedia", "LICENSE", "README.md"].map(file => fs.cp(file, join(staging, file)))]);
+	const failed = copies.find(result => result.status === "rejected");
+	if (failed?.status === "rejected") throw failed.reason;
+});

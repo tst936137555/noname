@@ -1,40 +1,33 @@
 import { ui, game, get, lib, _status } from "noname";
+import { fitMenu } from "./geometry.js";
 
-export function openMenu(node, e, onclose) {
-	popupContainer.innerHTML = "";
-	var left = Math.round(e.clientX / get.menuZoom());
-	var zoom = get.is.phoneLayout() ? 1.3 : 1;
-	popupContainer.appendChild(node);
-	// var rect=node.getBoundingClientRect();
+export function openMenu(node, anchor, onclose, container = popupContainer) {
+	container.replaceChildren(node);
+	container.classList.remove("hidden");
+	container.onclose = onclose;
 	if (node.classList.contains("visual")) {
-		// var num=node.querySelectorAll('.menu.visual>div').length;
-		// node.style.top=(e.y-node.offsetHeight/2+30)+'px';
-		for (var i = 0; i < node.childElementCount; i++) {
-			if (node.childNodes[i].update) {
-				node.childNodes[i].update();
-			}
-		}
-		// if(node.offsetTop<10){
-		// 	node.style.top='10px';
-		// }
+		for (const child of node.children) child.update?.();
 	}
-	// else if(get.is.phoneLayout()&&rect.top*1.3+rect.height*1.3+20>ui.window.offsetHeight){
-	// 	node.style.top=(ui.winheightdow.offsetHeight-20-rect.height*1.3)/1.3+'px';
-	// }
-	// if(e){
-	var height = node.offsetHeight;
-	var idealtop = e.clientY / get.menuZoom();
-	if (idealtop < 10) {
-		idealtop = 10;
-	} else if ((idealtop + height) * zoom + 10 > ui.window.offsetHeight) {
-		idealtop = (ui.window.offsetHeight - 10) / zoom - height;
-	}
-	node.style.top = idealtop + "px";
-	node.style.left = left + "px";
-	// }
-
-	popupContainer.classList.remove("hidden");
-	popupContainer.onclose = onclose;
+	// 测量实际弹出层，避免把屏幕像素、documentZoom 和 menuZoom 混用。
+	const rect = container.getBoundingClientRect();
+	const scaleX = rect.width / container.clientWidth || 1;
+	const scaleY = rect.height / container.clientHeight || 1;
+	const width = container.clientWidth;
+	const height = container.clientHeight;
+	node.style.maxWidth = Math.max(0, width - 20) + "px";
+	node.style.maxHeight = Math.max(0, height - 20) + "px";
+	node.style.overflowY = "auto";
+	const position = fitMenu({
+		x: (anchor.right - rect.left) / scaleX + 5,
+		y: (anchor.top - rect.top) / scaleY,
+		anchorLeft: (anchor.left - rect.left) / scaleX,
+		width: node.offsetWidth,
+		height: node.offsetHeight,
+		availableWidth: width,
+		availableHeight: height,
+	});
+	node.style.left = position.left + "px";
+	node.style.top = position.top + "px";
 }
 export function clickToggle() {
 	if (this.classList.contains("disabled")) {
@@ -52,50 +45,11 @@ export function clickToggle() {
 	}
 }
 export function clickSwitcher() {
-	if (this.classList.contains("disabled")) {
-		return;
-	}
-	var node = this;
+	if (this.classList.contains("disabled") || !this._link.menu) return;
 	this.classList.add("on");
-	if (this._link.menu) {
-		var pos1 = this.lastChild.getBoundingClientRect();
-		var pos2 = ui.window.getBoundingClientRect();
-		if (this._link.menu.classList.contains("visual")) {
-			openMenu(
-				this._link.menu,
-				{
-					clientX: pos1.left + pos1.width + 5 - pos2.left,
-					clientY: pos1.top - pos2.top,
-				},
-				function () {
-					node.classList.remove("on");
-				}
-			);
-		} else if (this._link.menu.childElementCount > 10) {
-			openMenu(
-				this._link.menu,
-				{
-					clientX: pos1.left + pos1.width + 5 - pos2.left,
-					clientY: Math.min((ui.window.offsetHeight - 400) / 2, pos1.top - pos2.top),
-				},
-				function () {
-					node.classList.remove("on");
-				}
-			);
-			lib.setScroll(this._link.menu);
-		} else {
-			openMenu(
-				this._link.menu,
-				{
-					clientX: pos1.left + pos1.width + 5 - pos2.left,
-					clientY: pos1.top - pos2.top,
-				},
-				function () {
-					node.classList.remove("on");
-				}
-			);
-		}
-	}
+	const container = this.closest(".menu-container")?._popupContainer || popupContainer;
+	openMenu(this._link.menu, this.lastChild.getBoundingClientRect(), () => this.classList.remove("on"), container);
+	lib.setScroll(this._link.menu);
 }
 /**
  * @this { HTMLDivElement } menuContainer
@@ -151,11 +105,6 @@ export function createMenu(connectMenu, tabs, config) {
 		menuContainer.classList.add("centermenu");
 	}
 	var menuTab = ui.create.div(".menu-tab", menu);
-	var menuTabBar = ui.create.div(".menu-tab-bar", menu);
-	menuTabBar.style.left = (config.bar || 0) + "px";
-	if (Math.round(2 * get.menuZoom()) < 2) {
-		menuTabBar.style.height = "3px";
-	}
 	var menuContent = ui.create.div(".menu-content", menu);
 	var clickTab = function () {
 		if (this.classList.contains("disabled")) {
@@ -167,7 +116,6 @@ export function createMenu(connectMenu, tabs, config) {
 			active._link.remove();
 		}
 		this.classList.add("active");
-		menuTabBar.style.transform = "translateX(" + (this.getBoundingClientRect().left - this.parentNode.firstChild.getBoundingClientRect().left) / get.menuZoom() + "px)";
 		menuContent.appendChild(this._link);
 	};
 	ui.click.menuTab = function (tab) {
@@ -182,6 +130,7 @@ export function createMenu(connectMenu, tabs, config) {
 	for (var i = 0; i < tabs.length; i++) {
 		var active = i === (config.init || 0);
 		pages[i] = createPage(active ? menuContent : null);
+		pages[i].dataset.menuTab = tabs[i];
 		ui.create.div(active ? ".active" : "", tabs[i], menuTab, clickTab)._link = pages[i];
 	}
 	return {
@@ -448,6 +397,7 @@ export function menu(connectMenu) {
 			cachePopupContainer.onclose();
 		}
 	}));
+	cacheMenuContainer._popupContainer = cachePopupContainer;
 
 	if (!connectMenu) {
 		ui.menuContainer = cacheMenuContainer;
@@ -466,9 +416,8 @@ export function menu(connectMenu) {
 				clickContainer.call(cacheMenuContainer, connectMenu);
 			}
 		};
-		menux = createMenu(connectMenu, ["开始", "选项", "武将", "卡牌", "扩展", "其它"], {
+		menux = createMenu(connectMenu, ["开始", "选项", "武将", "卡牌", "其它"], {
 			position: cacheMenuContainer,
-			bar: 40,
 		});
 	} else {
 		ui.connectMenuContainer = cacheMenuContainer;
@@ -506,7 +455,6 @@ export function menu(connectMenu) {
 
 		menux = createMenu(connectMenu, ["模式", "武将", "卡牌"], {
 			position: cacheMenuContainer,
-			bar: 123,
 		});
 		// menu = menux.menu;
 		let cacheMenux = menux;
@@ -526,9 +474,6 @@ export function menu(connectMenu) {
 	// 卡牌
 	let updatecardPackMenu = ui.create.cardPackMenu(connectMenu);
 	ui.updateCardPackMenu.push(updatecardPackMenu);
-
-	// 扩展
-	ui.create.extensionMenu(connectMenu);
 
 	// 其他
 	ui.create.otherMenu(connectMenu);

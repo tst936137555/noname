@@ -1,5 +1,5 @@
 //@ts-nocheck
-import { checkVersion } from "../library/update.js";
+import { checkVersion } from "../util/version.js";
 
 export default function nodeReady({ lib, game, get, _status, ui }) {
 	// 处理Node环境下的http情况
@@ -79,7 +79,7 @@ export default function nodeReady({ lib, game, get, _status, ui }) {
 
 	game.download = function (url, folder, onsuccess, onerror, dev, onprogress) {
 		if (!url.startsWith("http")) {
-			url = get.url(dev) + url;
+			url = new URL(url, new URL(lib.assetURL || "./", document.baseURI)).href;
 		}
 		game.ensureDirectory(
 			folder,
@@ -89,8 +89,6 @@ export default function nodeReady({ lib, game, get, _status, ui }) {
 				} catch (e) {
 					onerror();
 				}
-				lib.config.brokenFile.add(folder);
-				game.saveConfigValue("brokenFile");
 				if (!lib.node.http) {
 					lib.node.http = require("http");
 				}
@@ -102,8 +100,6 @@ export default function nodeReady({ lib, game, get, _status, ui }) {
 				(url.startsWith("https") ? lib.node.https : lib.node.http).get(opts, function (response) {
 					var stream = response.pipe(file);
 					stream.on("finish", function () {
-						lib.config.brokenFile.remove(folder);
-						game.saveConfigValue("brokenFile");
 						if (onsuccess) {
 							onsuccess();
 						}
@@ -134,8 +130,10 @@ export default function nodeReady({ lib, game, get, _status, ui }) {
 		const downloadLink = document.createElement("a");
 		downloadLink.download = fileNameToSaveAs;
 		downloadLink.innerHTML = "Download File";
-		downloadLink.href = window.URL.createObjectURL(data);
+		const url = window.URL.createObjectURL(data);
+		downloadLink.href = url;
 		downloadLink.click();
+		setTimeout(() => URL.revokeObjectURL(url), 60000);
 	};
 
 	game.exit = function () {
@@ -453,7 +451,4 @@ export default function nodeReady({ lib, game, get, _status, ui }) {
 			}
 		}
 	};
-	if (ui.updateUpdate) {
-		ui.updateUpdate();
-	}
 }
