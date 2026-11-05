@@ -9,6 +9,29 @@ import { resourceManifest, verifyManifest } from "./lib/assets.js";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 
+test("发行归档解压后保留重音和中文文件名", async t => {
+	const root = await mkdtemp(join(tmpdir(), "noname-archive-"));
+	t.after(() => rm(root, { recursive: true, force: true }));
+	const source = join(root, "dist");
+	const restored = join(root, "restored");
+	await mkdir(join(source, "game"), { recursive: true });
+	await mkdir(join(source, "audio/die"), { recursive: true });
+	await mkdir(restored);
+	for (const name of ["dc_zhangyì.mp3", "语音.mp3"]) {
+		await writeFile(join(source, "audio/die", name), name);
+	}
+	const manifest = await resourceManifest(source);
+	const archive = join(root, "distribution.tar");
+	if (process.platform === "win32") {
+		// CI creates the PAX archive on Linux; Windows only reads it.
+		await copyFile(new URL("./fixtures/distribution-unicode.tar", import.meta.url), archive);
+	} else {
+		execFileSync("tar", ["--format=pax", "-cf", archive, "dist"], { cwd: root, windowsHide: true });
+	}
+	execFileSync("tar", ["-xf", archive, "-C", restored], { windowsHide: true });
+	await verifyManifest(join(restored, "dist"), manifest);
+});
+
 test("Windows 打包恢复被默认过滤器遗漏的资源并校验清单", async t => {
 	const root = await mkdtemp(join(tmpdir(), "noname-portable-resources-"));
 	t.after(() => rm(root, { recursive: true, force: true }));

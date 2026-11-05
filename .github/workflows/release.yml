@@ -94,6 +94,7 @@ jobs:
 
             - name: Run regression tests
               run: |
+                  pnpm -F @noname/fs build
                   pnpm test
                   pnpm check:types
 

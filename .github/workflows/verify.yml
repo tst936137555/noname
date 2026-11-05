@@ -56,7 +56,9 @@ jobs:
             - run: xvfb-run -a pnpm test:browser
             - run: xvfb-run -a pnpm test:modes
             - name: Archive verified distribution
-              run: tar -cf output/noname-dist.tar dist
+              run: tar --format=pax -cf output/noname-dist.tar dist
+              env:
+                  LC_ALL: C.UTF-8
             - uses: actions/upload-artifact@v7
               with:
                   name: verified-distribution
@@ -81,11 +83,13 @@ jobs:
             - uses: ./.github/actions/setup
               with:
                   electron-runtime: "true"
+            - run: node --import tsx --test scripts/distribution.test.js
             - uses: actions/download-artifact@v8
               with:
                   name: verified-distribution
                   path: output
             - run: tar -xf output/noname-dist.tar
+            - run: pnpm verify:assets
             - run: pnpm -F @noname/electron build:win
             - name: Extract final ZIP and start executable
               shell: pwsh
@@ -116,6 +120,7 @@ jobs:
                   name: verified-distribution
                   path: output
             - run: tar -xf output/noname-dist.tar
+            - run: pnpm verify:assets
             - uses: actions/setup-java@v5
               with:
                   distribution: temurin
@@ -139,6 +144,7 @@ jobs:
                   name: verified-distribution
                   path: output
             - run: tar -xf output/noname-dist.tar
+            - run: pnpm verify:assets
             - run: pnpm -F @noname/mobile sync:ios
             - name: Compile iOS without signing credentials
               working-directory: apps/mobile/native/ios/App
