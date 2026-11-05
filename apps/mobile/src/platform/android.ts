@@ -1,11 +1,12 @@
 import { registerPlugin } from "@capacitor/core";
-import { joinFilePath, dataToBase64, base64ToArrayBuffer, toTriState, callbackError, type EntryType, type MinimalFileSystem } from "./general";
+import { joinFilePath, dataToBase64, base64ToArrayBuffer, toTriState, callbackError, type EntryType, type MinimalFileSystem, type LegacyFileSystemGame } from "./general";
 
 interface AccessResult {
 	granted: boolean;
 	rootUri?: string;
 }
 interface SafFsPlugin extends MinimalFileSystem {
+	shareExport(options: { path: string }): Promise<void>;
 	readFile(options: { fileName: string }): Promise<{ data: string }>;
 	readFileAsText(options: { fileName: string }): Promise<{ data: string }>;
 	writeFile(options: { path: string; data: string }): Promise<void>;
@@ -23,6 +24,14 @@ interface SafFsPlugin extends MinimalFileSystem {
 
 let fs: SafFsPlugin;
 
+export async function androidExportLocation() {
+	return (await fs.hasAccess()).rootUri || "您授权的目录";
+}
+
+export function shareAndroidExport(path: string) {
+	return fs.shareExport({ path });
+}
+
 export async function initializeAndroid(): Promise<{ fs: MinimalFileSystem }> {
 	fs = registerPlugin<SafFsPlugin>("SafFs");
 	// SafFs拥有方式then，直接返回会视为PromiseLike，得包一层
@@ -35,31 +44,27 @@ async function ensureWriteAccess(): Promise<void> {
 	if (!access.granted) throw new Error("未授权导出目录");
 }
 
-export function attachAndroidFileSystem(game: any): void {
+export function attachAndroidFileSystem(game: LegacyFileSystemGame): void {
 	game.checkFile = function checkFile(fileName, callback, onerror) {
-		fs
-			.statEntry({ entryName: fileName })
+		fs.statEntry({ entryName: fileName })
 			.then(result => callback?.(toTriState(result.type, "file")))
 			.catch(error => callbackError(onerror, error));
 	};
 
 	game.checkDir = function checkDir(dir, callback, onerror) {
-		fs
-			.statEntry({ entryName: dir })
+		fs.statEntry({ entryName: dir })
 			.then(result => callback?.(toTriState(result.type, "directory")))
 			.catch(error => callbackError(onerror, error));
 	};
 
-	game.readFile = function readFile(fileName, callback = (_: any) => {}, onerror = () => {}) {
-		fs
-			.readFile({ fileName })
+	game.readFile = function readFile(fileName, callback = _data => {}, onerror = () => {}) {
+		fs.readFile({ fileName })
 			.then(result => callback(base64ToArrayBuffer(result.data)))
 			.catch(error => callbackError(onerror, error));
 	};
 
-	game.readFileAsText = function readFileAsText(fileName, callback = (_: any) => {}, onerror = () => {}) {
-		fs
-			.readFileAsText({ fileName })
+	game.readFileAsText = function readFileAsText(fileName, callback = _data => {}, onerror = () => {}) {
+		fs.readFileAsText({ fileName })
 			.then(result => callback(result.data))
 			.catch(error => callbackError(onerror, error));
 	};
@@ -76,9 +81,8 @@ export function attachAndroidFileSystem(game: any): void {
 			.then(() => callback(), callback);
 	};
 
-	game.removeFile = function removeFile(fileName, callback = (_?: any) => {}, onerror = () => {}) {
-		fs
-			.removeFile({ fileName })
+	game.removeFile = function removeFile(fileName, callback = (_error?: unknown) => {}, onerror = () => {}) {
+		fs.removeFile({ fileName })
 			.then(() => callback())
 			.catch(error => {
 				callback(error);
@@ -86,9 +90,8 @@ export function attachAndroidFileSystem(game: any): void {
 			});
 	};
 
-	game.getFileList = function getFileList(dir, callback = (_folders: any, _files: any) => {}, onerror) {
-		fs
-			.getFileList({ dir })
+	game.getFileList = function getFileList(dir, callback = (_folders, _files) => {}, onerror) {
+		fs.getFileList({ dir })
 			.then(result => callback(result.folders, result.files))
 			.catch(error => callbackError(onerror, error));
 	};
@@ -109,8 +112,7 @@ export function attachAndroidFileSystem(game: any): void {
 	};
 
 	game.removeDir = function removeDir(directory, successCallback = () => {}, errorCallback = console.error) {
-		fs
-			.removeDir({ dir: directory })
+		fs.removeDir({ dir: directory })
 			.then(() => successCallback())
 			.catch(error => callbackError(errorCallback, error));
 	};

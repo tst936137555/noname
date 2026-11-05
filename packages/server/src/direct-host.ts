@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { randomUUID } from "node:crypto";
+import { boundedSend, messageBudget, MAX_MESSAGE_BYTES } from "./transport";
 export type HostEvent = { type: "connection" | "message" | "close"; id: string; data?: string };
 /** Fixed-purpose desktop LAN host. No renderer-controlled ports or native objects. */
 export class DirectHost {
@@ -12,7 +13,7 @@ export class DirectHost {
 	private sockets = new Map<string, WebSocket>();
 	async start(notify: (event: HostEvent) => void) {
 		if (this.server) throw new Error("Host already running");
-		const server = new WebSocketServer({ port: this.listenPort, maxPayload: 1024 * 1024 });
+		const server = new WebSocketServer({ port: this.listenPort, maxPayload: MAX_MESSAGE_BYTES });
 		this.server = server;
 		server.on("error", () => {});
 		server.on("connection", socket => {
@@ -23,20 +24,36 @@ export class DirectHost {
 			const id = randomUUID();
 			this.sockets.set(id, socket);
 			socket.on("error", () => socket.terminate());
-			let start = Date.now(),
-				count = 0;
-			socket.on("message", data => {
-				if (Date.now() - start >= 1000) {
-					start = Date.now();
-					count = 0;
-				}
-				if (++count > 200) {
+			const budget = messageBudget();
+			const admission = setTimeout(() => socket.terminate(), 10000);
+			let alive = true;
+			socket.on("pong", () => {
+				alive = true;
+			});
+			const heartbeat = setInterval(() => {
+				if (!alive) {
 					socket.terminate();
 					return;
 				}
-				notify({ type: "message", id, data: String(data) });
+				alive = false;
+				socket.ping();
+			}, 30000);
+			socket.on("message", data => {
+				const message = String(data);
+				if (!budget(Buffer.byteLength(message))) {
+					socket.terminate();
+					return;
+				}
+				try {
+					if (JSON.parse(message)?.[0] === "init") clearTimeout(admission);
+				} catch {
+					/* Engine rejects malformed messages. */
+				}
+				notify({ type: "message", id, data: message });
 			});
 			socket.on("close", () => {
+				clearTimeout(admission);
+				clearInterval(heartbeat);
 				this.sockets.delete(id);
 				notify({ type: "close", id });
 			});
@@ -56,14 +73,7 @@ export class DirectHost {
 	send(id: unknown, data: unknown) {
 		if (typeof id !== "string" || typeof data !== "string" || Buffer.byteLength(data) > 1024 * 1024) return;
 		const socket = this.sockets.get(id);
-		if (socket?.readyState !== WebSocket.OPEN) return;
-		if (socket.bufferedAmount > 4 * 1024 * 1024) {
-			socket.terminate();
-			return;
-		}
-		socket.send(data, error => {
-			if (error) socket.terminate();
-		});
+		if (socket) boundedSend(socket, data);
 	}
 	close(id: unknown) {
 		if (typeof id === "string") this.sockets.get(id)?.terminate();

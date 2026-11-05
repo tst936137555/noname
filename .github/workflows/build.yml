@@ -42,6 +42,19 @@ jobs:
                   NONAME_BUILD_COMMIT: ${{ github.sha }}
               run: pnpm build
 
+            - name: Verify distribution resources
+              # Validate the same complete directory that is uploaded.
+              run: pnpm verify:assets
+
+            - name: Build desktop preload and smoke test
+              run: |
+                  pnpm -F @noname/electron build
+                  SANDBOX_FILE=$(node -p "require('node:path').join(require('node:path').dirname(require('./apps/electron/node_modules/electron')), 'chrome-sandbox')")
+                  test -f "$SANDBOX_FILE"
+                  sudo chown root:root "$SANDBOX_FILE"
+                  sudo chmod 4755 "$SANDBOX_FILE"
+                  xvfb-run -a pnpm test:browser
+
             - name: Upload build artifact
               uses: actions/upload-artifact@v7
               with:

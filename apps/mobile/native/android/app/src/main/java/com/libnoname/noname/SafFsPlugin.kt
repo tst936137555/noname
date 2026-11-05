@@ -22,6 +22,24 @@ class SafFsPlugin : Plugin() {
         get() = SafOverlayStore(getContext())
 
     @PluginMethod
+    fun shareExport(call: PluginCall) {
+        try {
+            val path = call.getString("path") ?: throw IllegalArgumentException("缺少导出路径")
+            val segments = store.segments(path)
+            require(segments.firstOrNull() == "export") { "仅允许分享导出文件" }
+            val file = store.findSaf(path) ?: throw IllegalArgumentException("导出文件不存在")
+            require(file.isFile) { "导出路径不是文件" }
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_STREAM, file.uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(Intent.createChooser(intent, "分享存档"))
+            call.resolve()
+        } catch (error: Exception) { call.reject(error.message, error) }
+    }
+
+    @PluginMethod
     fun hasAccess(call: PluginCall) {
         call.resolve(accessResult())
     }

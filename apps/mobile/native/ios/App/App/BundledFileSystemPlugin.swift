@@ -1,5 +1,6 @@
 import Capacitor
 import Foundation
+import UIKit
 
 /// 直接查询 App 包内 public/，不依赖构建时生成的资源清单。
 @objc(BundledFileSystemPlugin)
@@ -8,8 +9,43 @@ public class BundledFileSystemPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "BundledFileSystem"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "stat", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "readdir", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "readdir", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "shareExport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openExternal", returnType: CAPPluginReturnPromise)
     ]
+
+    @objc func openExternal(_ call: CAPPluginCall) {
+        guard let text = call.getString("url"), let url = URL(string: text),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+            call.reject("无效的外部链接"); return
+        }
+        DispatchQueue.main.async {
+            UIApplication.shared.open(url) { success in
+                if success { call.resolve() } else { call.reject("无法打开外部链接") }
+            }
+        }
+    }
+
+    @objc func shareExport(_ call: CAPPluginCall) {
+        guard let path = call.getString("path"), let normalized = NonameRouter.normalize(path),
+              normalized.hasPrefix("export/"),
+              let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            call.reject("无效的导出路径"); return
+        }
+        let url = root.appendingPathComponent(normalized).resolvingSymlinksInPath()
+        guard url.path.hasPrefix(root.resolvingSymlinksInPath().path + "/export/"),
+              FileManager.default.fileExists(atPath: url.path) else { call.reject("导出文件不存在"); return }
+        DispatchQueue.main.async {
+            guard let controller = self.bridge?.viewController else { call.reject("无法打开分享面板"); return }
+            let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            sheet.popoverPresentationController?.sourceView = controller.view
+            sheet.popoverPresentationController?.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
+            sheet.completionWithItemsHandler = { _, _, _, error in
+                if let error = error { call.reject(error.localizedDescription) } else { call.resolve() }
+            }
+            controller.present(sheet, animated: true)
+        }
+    }
 
     @objc func stat(_ call: CAPPluginCall) {
         do {

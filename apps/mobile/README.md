@@ -55,7 +55,7 @@ The script checks the active Java version before building and stops with a clear
 
 #### Release Signing
 
-Release signing reads values from environment variables first, then from the local `native/android/keystore.properties` file. If no signing values are provided, the build falls back to the debug keystore for development.
+Release signing reads values from environment variables first, then from the local `native/android/keystore.properties` file. Release builds fail when signing values are absent. Use `--variant=debug` for development; debug builds also load bundled resources unless an explicit local development URL is supplied.
 
 For local builds, create `native/android/keystore.properties` (this file is ignored by Git):
 
@@ -78,6 +78,8 @@ ANDROID_KEY_PASSWORD=...
 The GitHub Actions release workflow stores the keystore as the `ANDROID_KEYSTORE_BASE64` secret and restores it during the job. Add that secret together with `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD` in the repository settings.
 
 The release APK/AAB is then signed automatically by `build:android`. Keep the keystore and passwords outside the repository; losing the keystore prevents updates to an already-published app.
+
+Android retains Capacitor's navigation, page lifecycle and error callbacks while intercepting packaged resources. The web adapter handles background audio, resume layout refresh and the Android back button. Export success identifies the selected SAF folder or iOS Files location and can open the native share sheet; external links open outside the game WebView. A debug-only `nonameDevUrl` intent extra can select a local server, for example `http://10.0.2.2:8081`.
 
 ### iOS
 

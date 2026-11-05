@@ -1,8 +1,6 @@
 // 声明：沙盒维护的是服务器秩序，让服务器秩序不会因为非房主的玩家以及旁观者的影响，并在此基础上维护玩家设备不受危险代码攻击
 // 但沙盒不会也没有办法维护恶意服务器/房主对于游戏规则的破坏，请玩家尽量选择官方或其他安全的服务器，同时选择一个受信任的玩家作为房主
 
-import { MD5 } from "crypto-js";
-
 // 是否强制所有模式下使用沙盒
 const SANDBOX_FORCED = false;
 // 是否启用自动测试
@@ -12,15 +10,6 @@ const SANDBOX_AUTOTEST = false;
 const SANDBOX_AUTOTEST_NODELAY = false;
 // 沙盒开发模式
 const SANDBOX_DEV = false;
-
-const WSURL_FOR_IP = /ws:\/\/(\d+.\d+.\d+.\d+):\d+\//;
-
-/** @type {readonly string[]} */
-const TRUSTED_IPS = Object.freeze([]); // 标记哪些服务器IP是可信任的
-/** @type {readonly string[]} */
-const TRUSTED_IP_MD5 = Object.freeze([
-	// 被拷打了喵 > <
-]); // 标记哪些服务器IP的MD5是可信任的，MD5计算方式是`md5("noname_server" + ip)`
 
 // 声明导入类
 /** @type {boolean} */
@@ -223,95 +212,18 @@ function requireSandbox() {
 
 const GRANTED_LIST_KEY = "security_grantedServers";
 
-/**
- * @param {string} key
- * @returns {Record<string,boolean>}
- */
-function readStorage(key) {
-	const value = localStorage.getItem(key);
-
-	if (!value) {
-		return {};
-	}
-
-	const mayArray = JSON.parse(value);
-
-	if (!mayArray || typeof mayArray != "object") {
-		return {};
-	}
-
-	return mayArray;
-}
-
-/**
- * 重置受信任的服务器列表
- */
+/** Remove obsolete trust choices; all remote code now requires isolation. */
 function resetGrantedServers() {
 	localStorage.removeItem(GRANTED_LIST_KEY);
 }
 
 /**
  * @param {string} ip
- * @returns {boolean}
- */
-function alertForServer(ip) {
-	const grantedList = readStorage(GRANTED_LIST_KEY);
-	const granted = grantedList[ip];
-
-	if (granted != null) {
-		return !!granted;
-	}
-
-	const newResult = alertForNewServer();
-	grantedList[ip] = newResult;
-	localStorage.setItem(GRANTED_LIST_KEY, JSON.stringify(grantedList));
-	return newResult;
-}
-
-/**
- * @returns {boolean}
- */
-function alertForNewServer() {
-	const tips = ["您登录的服务器不在受信任的列表中，是否要信任来自服务器的代码?", "\n如果您信任此服务器则可以选择“确定”，否则您应该选择“取消”来启动隔离沙盒。", "请注意：开启隔离沙盒可能会让服务器部分功能受限，以此换取更安全的执行环境。", "\n另外，您无论如何选择都可以随时通过点击“联机模式选项-更多-重置受信任的服务器列表”来重置您的选择。"];
-
-	return confirm(tips.join("\n"));
-}
-
-/**
- * ```plain
- * 检查服务器地址并请求进入沙盒运行模式
- * ```
- *
- * @param {string} ip
  */
 function requireSandboxOn(ip) {
-	let isTrusted = false;
-
-	if (ip) {
-		isTrusted = TRUSTED_IPS.includes(ip);
-
-		if (!isTrusted && TRUSTED_IP_MD5.length > 0) {
-			const md5 = MD5("noname_server" + ip).toString();
-			isTrusted = TRUSTED_IP_MD5.includes(md5);
-		}
-
-		if (!isTrusted) {
-			isTrusted = alertForServer(ip);
-		}
-	}
-
-	if (!isTrusted) {
-		sandBoxRequired = true;
-		return;
-	}
-
-	if (SANDBOX_FORCED && topVariables.game && topVariables.game.ws) {
-		const match = WSURL_FOR_IP.exec(topVariables.game.ws.url);
-
-		if (match && match[1] === ip) {
-			sandBoxRequired = false;
-		}
-	}
+	if (!SANDBOX_ENABLED) throw new Error("当前环境无法隔离联机代码，请使用支持隔离的客户端");
+	// Remote code is always isolated, including previously trusted servers and Safari.
+	sandBoxRequired = true;
 }
 
 /**
@@ -501,13 +413,17 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	initIsolatedEnvironment();
 
 	// 不允许被远程代码访问的game函数
-	const ioFuncs = ["download", "readFile", "readFileAsText", "writeFile", "removeFile", "getFileList", "ensureDirectory", "createDir", "removeDir", "export", "multiDownload2", "multiDownload", "fetch"];
+	const ioFuncs = ["download", "readFile", "readFileAsText", "writeFile", "removeFile", "getFileList", "ensureDirectory", "createDir", "removeDir", "export", "multiDownload2", "multiDownload", "fetch", "getDB", "putDB", "deleteDB", "saveConfig"];
 
 	const accessDenieds = [
 		...ioFuncs.map(n => game[n]).filter(Boolean),
 		...Object.values(game.promises),
 		defaultEval,
 		localStorage.setItem,
+		localStorage.getItem,
+		localStorage.removeItem,
+		localStorage.clear,
+		localStorage.key,
 		window.require,
 		// @ts-expect-error There's
 		window.define,
@@ -520,7 +436,7 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	callRule.setGranted(AccessAction.NEW, false); // 禁止函数new调用
 
 	// 为禁止的函数设置规则
-	accessDenieds.filter(Boolean).forEach(o => {
+	[...new Set(accessDenieds.filter(Boolean))].forEach(o => {
 		Marshal.setRule(o, callRule);
 	});
 
@@ -538,11 +454,10 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	exposedClassRule.setGranted(AccessAction.META, false); // 禁止不安全代码更改这些类的原型
 
 	// 为所有Event类型应用上面的规则
-	Reflect.ownKeys(globalThis)
-		.filter(key => typeof key == "string")
-		.filter(key => /^\w*?Event$/.test(key))
-		.map(key => globalThis[key])
-		.forEach(o => Marshal.setRule(o, exposedClassRule));
+	const eventClasses = Reflect.ownKeys(globalThis)
+		.filter(key => typeof key == "string" && /^\w*?Event$/.test(key))
+		.map(key => globalThis[key]);
+	[...new Set(eventClasses)].forEach(o => Marshal.setRule(o, exposedClassRule));
 
 	// 构造禁止访问的规则
 	const bannedRule = new Rule();
@@ -556,7 +471,7 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	bannedRule.setGranted(AccessAction.META, false); // 禁止设置原型
 
 	// 禁止访问关键对象
-	[lib.cheat, lib.node, lib.message, lib.fs, window.process, window.module, window.exports, window.cordova, window.NonameAndroidBridge, window.noname_shijianInterfaces, window].filter(Boolean).forEach(o => Marshal.setRule(o, bannedRule));
+	[lib.cheat, lib.node, lib.message, lib.fs, lib.db, localStorage, window.process, window.module, window.exports, window.cordova, window.NonameAndroidBridge, window.noname_shijianInterfaces, window.nonameDesktop, window.Capacitor, window.indexedDB, window.sessionStorage, window].filter(Boolean).forEach(o => Marshal.setRule(o, bannedRule));
 
 	// 构造禁止修改的规则
 	const writeRule = new Rule();
@@ -564,8 +479,6 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	writeRule.setGranted(AccessAction.DEFINE, false); // 禁止重定义属性
 	// 禁止修改 game.promises 的函数
 	Marshal.setRule(game.promises, writeRule);
-	// 禁止修改 localStorage
-	Marshal.setRule(localStorage, writeRule);
 
 	// 对于 game 当中访问特定函数我们通过 Monitor 进行拦截
 	new Monitor()
@@ -590,7 +503,7 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 		.action(AccessAction.DEFINE)
 		.action(AccessAction.DELETE)
 		.require("target", lib)
-		.require("property", "fs")
+		.require("property", "fs", "db")
 		.then(() => {
 			throw new Error("不允许不受信任的代码访问 `lib.fs`");
 		})

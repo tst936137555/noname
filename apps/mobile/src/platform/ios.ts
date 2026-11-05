@@ -1,8 +1,10 @@
 import { registerPlugin } from "@capacitor/core";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
-import { joinFilePath, dataToBase64, base64ToArrayBuffer, toTriState, callbackError, type EntryType, type MinimalFileSystem } from "./general";
+import { joinFilePath, dataToBase64, base64ToArrayBuffer, toTriState, callbackError, type EntryType, type MinimalFileSystem, type LegacyFileSystemGame } from "./general";
 
 interface BundledFileSystem {
+	shareExport(options: { path: string }): Promise<void>;
+	openExternal(options: { url: string }): Promise<void>;
 	stat(options: { path: string }): Promise<{ type: EntryType }>;
 	readdir(options: { path: string }): Promise<{
 		folders: string[];
@@ -12,12 +14,19 @@ interface BundledFileSystem {
 
 let fs: IosFileSystem;
 
+export function shareIosExport(path: string) {
+	return registerPlugin<BundledFileSystem>("BundledFileSystem").shareExport({ path });
+}
+export function openIosExternal(url: string) {
+	return registerPlugin<BundledFileSystem>("BundledFileSystem").openExternal({ url });
+}
+
 export function initializeIos(): { fs: MinimalFileSystem } {
 	fs = new IosFileSystem(registerPlugin<BundledFileSystem>("BundledFileSystem"));
 	return { fs };
 }
 
-export function attachIosFileSystem(game: any): void {
+export function attachIosFileSystem(game: LegacyFileSystemGame): void {
 	game.checkFile = function checkFile(fileName, callback, onerror) {
 		fs.statEntry({ entryName: fileName })
 			.then(result => callback?.(toTriState(result.type, "file")))
@@ -30,13 +39,13 @@ export function attachIosFileSystem(game: any): void {
 			.catch(error => callbackError(onerror, error));
 	};
 
-	game.readFile = function readFile(fileName, callback = (_: any) => {}, onerror = () => {}) {
+	game.readFile = function readFile(fileName, callback = _data => {}, onerror = () => {}) {
 		fs.readFile({ fileName })
 			.then(result => callback(typeof result.data === "string" ? base64ToArrayBuffer(result.data) : result.data))
 			.catch(error => callbackError(onerror, error));
 	};
 
-	game.readFileAsText = function readFileAsText(fileName, callback = (_: any) => {}, onerror = () => {}) {
+	game.readFileAsText = function readFileAsText(fileName, callback = _data => {}, onerror = () => {}) {
 		fs.readFileAsText({ fileName })
 			.then(result => callback(result.data))
 			.catch(error => callbackError(onerror, error));
@@ -53,7 +62,7 @@ export function attachIosFileSystem(game: any): void {
 			.then(() => callback(), callback);
 	};
 
-	game.removeFile = function removeFile(fileName, callback = (_?: any) => {}, onerror = () => {}) {
+	game.removeFile = function removeFile(fileName, callback = (_error?: unknown) => {}, onerror = () => {}) {
 		fs.removeFile({ fileName })
 			.then(() => callback())
 			.catch(error => {
@@ -62,7 +71,7 @@ export function attachIosFileSystem(game: any): void {
 			});
 	};
 
-	game.getFileList = function getFileList(dir, callback = (_folders: any, _files: any) => {}, onerror) {
+	game.getFileList = function getFileList(dir, callback = (_folders, _files) => {}, onerror) {
 		fs.getFileList({ dir })
 			.then(result => callback(result.folders, result.files))
 			.catch(error => callbackError(onerror, error));

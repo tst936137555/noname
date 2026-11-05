@@ -1,6 +1,7 @@
 export interface ServerOptions {
 	port?: number;
 	host?: string;
+	credentialDirectory?: string;
 }
 
 export interface ServerInstance {

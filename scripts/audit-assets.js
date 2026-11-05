@@ -22,9 +22,10 @@ async function walk(directory) {
 		files++;
 	}
 }
-for (const dir of ["image", "audio", "font"]) await walk(join("apps/core", dir));
+for (const dir of ["image", "audio", "font", "theme", "layout"]) await walk(join("apps/core", dir));
 const duplicates = [...groups.values()].filter(group => group.paths.length > 1);
-const report = { files, bytes, duplicateBytes: duplicates.reduce((sum, group) => sum + group.size * (group.paths.length - 1), 0), duplicates };
+// Dynamic resource paths require a retained-asset list; this inventory never deletes candidates.
+const report = { scope: ["image", "audio", "font", "theme", "layout"], files, bytes, duplicateBytes: duplicates.reduce((sum, group) => sum + group.size * (group.paths.length - 1), 0), duplicates };
 await mkdir("output", { recursive: true });
 await writeFile("output/resource-audit.json", JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ files, bytes, duplicateBytes: report.duplicateBytes }));

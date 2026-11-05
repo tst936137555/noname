@@ -9,8 +9,12 @@ permissions:
     contents: write # 允许 Actions 推送代码到仓库
 
 jobs:
+    verify:
+        uses: ./.github/workflows/verify.yml
+
     publish:
         name: Nightly Publish
+        needs: verify
         runs-on: ubuntu-latest
 
         steps:

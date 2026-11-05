@@ -1,6 +1,6 @@
+/// <reference types="vite/client" />
 import { DirectHost } from "../../../packages/server/src/direct-host";
 import { networkInterfaces } from "node:os";
-/// <reference types="vite/client" />
 import { app, BrowserWindow, crashReporter, dialog, Menu, shell, ipcMain } from "electron";
 import fs from "fs";
 import path from "path";

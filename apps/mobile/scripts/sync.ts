@@ -3,6 +3,7 @@ import { resolve } from "path";
 import { spawnSync } from "child_process";
 import { build } from "vite";
 import { syncMobileVersion } from "../../../scripts/lib/game-version.js";
+import { resourceManifest } from "../../../scripts/lib/assets.js";
 
 const root = resolve(import.meta.dirname, "..");
 const workspaceRoot = resolve(root, "../..");
@@ -85,5 +86,6 @@ function patchAndroidAssets() {
 
 syncMobileVersion();
 await buildPreload();
+await resourceManifest(distDir);
 capSync();
 if (platform !== "ios") patchAndroidAssets();

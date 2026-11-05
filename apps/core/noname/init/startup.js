@@ -16,6 +16,7 @@ export async function preloadFont(font, timeout = 8000) {
 }
 
 export function updateStartupProgress(value, message) {
+	window.dispatchEvent(new Event("noname:startup-progress"));
 	const node = document.getElementById("startup-loading");
 	if (!node) return;
 	const progress = node.querySelector("progress");
@@ -27,6 +28,7 @@ export function updateStartupProgress(value, message) {
 
 export function hideStartupLoading() {
 	document.getElementById("startup-loading")?.setAttribute("hidden", "");
+	window.dispatchEvent(new Event("noname:startup-ready"));
 }
 
 export function showStartupLoading(message) {
@@ -34,7 +36,9 @@ export function showStartupLoading(message) {
 	updateStartupProgress(0, message);
 }
 
-export function failStartupLoading() {
+/** @param {unknown} error */
+export function failStartupLoading(error = new Error("游戏启动失败")) {
+	window.dispatchEvent(new CustomEvent("noname:startup-error", { detail: error }));
 	const node = document.getElementById("startup-loading");
 	if (!node) return;
 	node.removeAttribute("hidden");

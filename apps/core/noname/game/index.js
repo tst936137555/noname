@@ -1,3 +1,4 @@
+import { socketAddress } from "../util/network.js";
 /**
  * @typedef {{
  * 	cardMove: GameEvent[],
@@ -2132,55 +2133,19 @@ export class Game {
 			return;
 		}
 
-		let tempUrl;
-		// 如果能直接解析出URL，且协议为ws或wss，则直接赋值成URL，且不作其他处理
-		// （当然实际上，如果保证给定的地址以"ws://"或"wss://"开头，基本能判定为URL，无需重复判断）
-		if (URL.canParse(ip) && (ip.startsWith("ws://") || ip.startsWith("wss://"))) {
-			tempUrl = new URL(ip);
-		}
-		// 否则就尝试解析成URL，并套用约定的格式
-		else {
-			const protocol = get.config("wss_mode", "connect") ? "wss://" : "ws://";
-			let tempHref = `${protocol}${ip}`;
-
-			tempUrl = new URL(tempHref);
-
-			const ipv4Regex = /^(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-			const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
-
-			// 如果给定的地址是纯ip地址，则自动添加8080端口，兼容以前的地址
-			if (ipv4Regex.test(ip) || ipv6Regex.test(ip)) {
-				tempUrl.port = "8080";
-			}
-			// 否则...鉴于原先存在地址为域名/localhost的情况，鉴于原先的联机地址不兼容pathname，如果pathname为"/"，则多加判断
-			else if (tempUrl.pathname == "/") {
-				let withport = false;
-				let index = ip.lastIndexOf(":");
-				if (index != -1) {
-					index = parseFloat(ip.slice(index + 1));
-					if (index && Math.floor(index) == index) {
-						withport = true;
-					}
-				}
-
-				if (!withport) {
-					tempUrl.port = "8080";
-				}
-			}
-		}
-
-		const url = tempUrl.href;
-
 		_status.connectCallback = callback;
 		try {
+			const url = socketAddress(ip, get.config("wss_mode", "connect"));
+			security.requireSandboxOn(ip);
 			if (game.ws) {
 				game.ws._nocallback = true;
 				game.ws.close();
 				delete game.ws;
 			}
 			game.ws = new WebSocket(url);
-		} catch {
-			alert("错误：无效联机地址");
+		} catch (error) {
+			delete _status.connectCallback;
+			alert("连接失败：" + (error instanceof Error ? error.message : "无效联机地址"));
 			if (callback) {
 				callback(false);
 			}

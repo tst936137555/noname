@@ -1,4 +1,4 @@
-import { recordError } from "./diagnostics.js";
+import { recordError, showErrorNotice } from "./diagnostics.js";
 import StackFrame from "stackframe";
 import ErrorStackParser from "error-stack-parser";
 import StackTraceGPS from "stacktrace-gps";
@@ -109,6 +109,7 @@ export function setOnError({ lib, game, get, _status }) {
 	window.onerror = async (_msg: string | Event, _src?: string, _line?: number, _column?: number, err?: Error) => {
 		if (!err) return;
 		if (!recordError(err)) return;
+		showErrorNotice(lib);
 		const stackframes = await fromError(err);
 		const frame = stackframes[0].source || stackframes[0].origin;
 		const msg = err.message;
@@ -228,7 +229,6 @@ export function setOnError({ lib, game, get, _status }) {
 					})
 				);
 			}
-			alert(log.join("\n"));
 			game.print(log.join("\n"));
 		}
 	};

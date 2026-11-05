@@ -78,5 +78,15 @@ export default defineConfig(
 		files: ["scripts/**/*.cjs"],
 		languageOptions: { sourceType: "commonjs", globals: globals.node },
 		rules: { "@typescript-eslint/no-require-imports": "off" },
+	},
+	{
+		files: ["scripts/engineering.test.js", "scripts/verify-assets.js", "scripts/lib/assets.js", "packages/server/src/transport.ts", "packages/server/src/credentials.ts"],
+		languageOptions: { globals: { ...Object.fromEntries(Object.keys(globals.browser).map(key => [key, "off"])), ...globals.node } },
+		rules: { "no-undef": "error", "@typescript-eslint/no-explicit-any": "error", "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }] },
+	},
+	{
+		files: ["apps/core/bootstrap.js", "apps/core/noname/util/{reset,save,diagnostics,network}.js", "apps/core/noname/ui/accessibility.js"],
+		languageOptions: { globals: { ...Object.fromEntries(Object.keys(globals.node).map(key => [key, "off"])), ...globals.browser } },
+		rules: { "no-undef": "error", "@typescript-eslint/no-explicit-any": "error", "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }] },
 	}
 );

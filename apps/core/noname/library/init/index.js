@@ -2,6 +2,8 @@ import { rootURL, get, lib, game, _status, ui } from "noname";
 import { LibInitPromises } from "./promises.js";
 import { ContentCompiler } from "@/library/element/gameEvent.js";
 import { security } from "@/util/sandbox.js";
+import { parseWireMessage } from "../../util/network.js";
+import { sanitizeDiagnostic } from "../../util/diagnostics.js";
 
 export class LibInit {
 	#promises;
@@ -54,15 +56,13 @@ export class LibInit {
 	}
 
 	connection(ws) {
+		security.requireSandboxOn("");
 		const client = new lib.element.Client(ws);
 		lib.node.clients.push(client);
 		ws.on("message", function (messagestr) {
 			var message;
 			try {
-				message = JSON.parse(messagestr);
-				if (!Array.isArray(message) || typeof message[0] !== "string" || !Object.hasOwn(lib.message.server, message[0]) || typeof lib.message.server[message[0]] !== "function") {
-					throw new Error("err");
-				}
+				message = parseWireMessage(messagestr, lib.message.server);
 				if (client.sandbox) {
 					security.enterSandbox(client.sandbox);
 				}
@@ -77,7 +77,7 @@ export class LibInit {
 				}
 			} catch (e) {
 				console.log(e);
-				console.log("invalid message: " + messagestr);
+				console.warn("invalid message: " + sanitizeDiagnostic(messagestr));
 				return;
 			}
 			try {

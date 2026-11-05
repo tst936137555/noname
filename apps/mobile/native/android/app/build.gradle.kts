@@ -65,7 +65,9 @@ android {
         }
         logger.lifecycle("Release signing is configured.")
     } else {
-        logger.warn("Release signing is not configured; falling back to the debug keystore.")
+        if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+            throw GradleException("Release signing is required. Configure ANDROID_KEYSTORE_PATH and signing credentials, or build the debug variant.")
+        }
     }
 
     buildTypes {
@@ -84,7 +86,7 @@ android {
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("release")
             } else {
-                signingConfigs.getByName("debug")
+                null
             }
         }
     }

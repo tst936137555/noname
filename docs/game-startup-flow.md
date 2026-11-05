@@ -87,9 +87,9 @@ export { UI, ui, setUI } from "./noname/ui/index.js";
 
 ```text
 优先 /preload.js
-Electron -> init/node.js
+Electron -> init/browser.js + isolated nonameDesktop bridge
 普通浏览器 -> init/browser.js
-移动客户端/Cordova -> init/cordova.js
+Android/iOS Capacitor -> packaged preload.js (missing native preload is a startup error)
 ```
 
 preload 完成后，处理 GPL 确认，然后调用：
@@ -147,10 +147,10 @@ rank / replace / perfectPairs
 模式、卡包、武将包通过这些函数加载：
 
 ```js
-importMode(name)
-importCardPack(name)
-importCharacterPack(name)
-importExtension(name)
+importMode(name);
+importCardPack(name);
+importCharacterPack(name);
+importExtension(name);
 ```
 
 这些函数位于 `apps/core/noname/init/import.ts`。
@@ -169,9 +169,7 @@ importExtension(name)
 简化逻辑：
 
 ```js
-const path = alreadyModernMode.includes(name)
-  ? `/mode/${name}/index`
-  : `/mode/${name}`;
+const path = alreadyModernMode.includes(name) ? `/mode/${name}/index` : `/mode/${name}`;
 
 await importFunction("mode", path);
 ```
@@ -289,8 +287,8 @@ lib.skill
 
 ```js
 if (lib.init.startBefore) {
-  lib.init.startBefore();
-  delete lib.init.startBefore;
+	lib.init.startBefore();
+	delete lib.init.startBefore;
 }
 
 ui.create.arena();
@@ -443,7 +441,9 @@ game.showHistory()
 很多技能会监听：
 
 ```js
-trigger: { global: "gameStart" }
+trigger: {
+	global: "gameStart";
+}
 ```
 
 ## gameDraw
@@ -522,14 +522,7 @@ return next;
 `phase` content 默认阶段列表：
 
 ```js
-[
-  "phaseZhunbei",
-  "phaseJudge",
-  "phaseDraw",
-  "phaseUse",
-  "phaseDiscard",
-  "phaseJieshu",
-]
+["phaseZhunbei", "phaseJudge", "phaseDraw", "phaseUse", "phaseDiscard", "phaseJieshu"];
 ```
 
 回合开始时会：
@@ -700,7 +693,7 @@ gameStart
 部分模式 start 开头会检查：
 
 ```js
-localStorage.getItem(lib.configprefix + "playback")
+localStorage.getItem(lib.configprefix + "playback");
 ```
 
 如果存在录像：

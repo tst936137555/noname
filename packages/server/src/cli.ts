@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { createServer } from "./server/createServer";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 function readPort(): number {
 	const portArgIndex = process.argv.findIndex(arg => arg === "--port" || arg === "-p");
@@ -15,7 +17,7 @@ function readPort(): number {
 }
 
 const port = readPort();
-const server = createServer({ port });
+const server = createServer({ port, credentialDirectory: process.env.NONAME_LOBBY_DATA || join(homedir(), ".noname", "lobby-credentials") });
 
 const stop = async () => {
 	await server.stop();

@@ -9,8 +9,12 @@ permissions:
     contents: write
 
 jobs:
+    verify:
+        uses: ./.github/workflows/verify.yml
+
     create-release:
         name: Draft Release
+        needs: verify
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository

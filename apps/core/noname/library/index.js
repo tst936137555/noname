@@ -9,6 +9,10 @@
  * @typedef { InstanceType<typeof lib.element.Control> } Control
  */
 import { ai, get, game, _status, ui } from "noname";
+import { exportSave, checkSaveSize } from "../util/save.js";
+import { confirmReset, clearReconnectData } from "../util/reset.js";
+import { parseWireMessage } from "../util/network.js";
+import { sanitizeDiagnostic } from "../util/diagnostics.js";
 import { LibInit } from "./init/index.js";
 import { Announce } from "./announce/index.js";
 import { experimental } from "./experimental/index.js";
@@ -4934,36 +4938,9 @@ export class Library {
 				// 	clear:true
 				// },
 				reset_game: {
-					name: "重置游戏设置",
+					name: "清空游戏存档",
 					onclick() {
-						var node = this;
-						if (node._clearing) {
-							var noname_inited = localStorage.getItem("noname_inited");
-							var onlineKey = localStorage.getItem(lib.configprefix + "key");
-							localStorage.clear();
-							if (noname_inited) {
-								localStorage.setItem("noname_inited", noname_inited);
-							}
-							if (onlineKey) {
-								localStorage.setItem(lib.configprefix + "key", onlineKey);
-							}
-							game.deleteDB("config");
-							game.deleteDB("data");
-							game.reload();
-							return;
-						}
-						node._clearing = true;
-						node.firstChild.innerHTML = "单击以确认 (3)";
-						setTimeout(function () {
-							node.firstChild.innerHTML = "单击以确认 (2)";
-							setTimeout(function () {
-								node.firstChild.innerHTML = "单击以确认 (1)";
-								setTimeout(function () {
-									node.firstChild.innerHTML = "重置游戏设置";
-									delete node._clearing;
-								}, 1000);
-							}, 1000);
-						}, 1000);
+						void confirmReset(lib, game);
 					},
 					clear: true,
 				},
@@ -5002,29 +4979,15 @@ export class Library {
 					clear: true,
 				},
 				export_data: {
-					name: "导出游戏设置",
-					onclick() {
-						var data;
-						var export_data = function (data) {
-							game.export(lib.init.encode(JSON.stringify(data)), "无名杀 - 数据 - " + new Date().toLocaleString());
-						};
-						if (!lib.db) {
-							data = {};
-							for (var i in localStorage) {
-								if (i.startsWith(lib.configprefix)) {
-									data[i] = localStorage[i];
-								}
-							}
-							export_data(data);
-						} else {
-							game.getDB("config", null, function (data1) {
-								game.getDB("data", null, function (data2) {
-									export_data({
-										config: data1,
-										data: data2,
-									});
-								});
-							});
+					name: "导出游戏存档",
+					intro: "备份设置和游戏存档，不包含录像、自定义图片及音频。",
+					async onclick() {
+						try {
+							const save = await exportSave(lib.db, lib.version);
+							const encoded = checkSaveSize(lib.init.encode(JSON.stringify(save)));
+							await game.export(encoded, "无名杀 - 存档 - " + new Date().toLocaleString());
+						} catch (error) {
+							alert("导出失败：" + (error?.message || String(error)));
 						}
 					},
 					clear: true,
@@ -10064,10 +10027,7 @@ export class Library {
 				}
 				var message;
 				try {
-					message = JSON.parse(messageevent.data);
-					if (!Array.isArray(message) || typeof message[0] !== "string" || !Object.hasOwn(lib.message.client, message[0]) || typeof lib.message.client[message[0]] !== "function") {
-						throw new Error("err");
-					}
+					message = parseWireMessage(messageevent.data, lib.message.client);
 					if (game.sandbox) {
 						security.enterSandbox(game.sandbox);
 					}
@@ -10082,7 +10042,7 @@ export class Library {
 					}
 				} catch (e) {
 					console.log(e);
-					console.log("invalid message: " + messageevent.data);
+					console.warn("invalid message: " + sanitizeDiagnostic(messageevent.data));
 					return;
 				}
 				try {
@@ -10103,7 +10063,7 @@ export class Library {
 					alert("连接失败");
 				}
 			},
-			onclose: function () {
+			onclose: async function (event = { code: 0 }) {
 				if (this._nocallback) {
 					return;
 				}
@@ -10111,19 +10071,24 @@ export class Library {
 					_status.connectCallback(false);
 					delete _status.connectCallback;
 				}
-				if (game.online || game.onlineroom) {
-					if ((game.servermode || game.onlinehall) && _status.over) {
-						void 0;
-					} else {
-						localStorage.setItem(lib.configprefix + "directstart", true);
-						game.reload();
-					}
-				} else {
-					// game.saveConfig('reconnect_info');
-				}
+				const disconnected = game.online || game.onlineroom;
 				game.online = false;
+				game.onlineroom = false;
 				game.ws = null;
 				game.sandbox = null;
+				if (disconnected && !_status.over) {
+					ui.create.connecting(true);
+					const reason = event?.code === 1008 ? "连接认证或消息校验未通过。身份失效时可在存档管理中重置联机身份。" : event?.code === 1013 ? "大厅繁忙，请稍后再试。" : "联机连接已断开。";
+					if (confirm(reason + "\n是否返回选择界面？")) {
+						try {
+							await clearReconnectData(lib.db);
+							localStorage.removeItem(lib.configprefix + "directstart");
+							game.reload();
+						} catch (error) {
+							alert("无法清理连接状态，请稍后重试。");
+						}
+					}
+				}
 			},
 		},
 		/**
@@ -11930,7 +11895,9 @@ export class Library {
 			/**
 			 * @this {import("./element/client.js").Client}
 			 */
-			chat(id, str) {
+			chat(_id, str) {
+				if (typeof str !== "string" || str.length > 1000) return;
+				const id = this.id;
 				if (lib.node.observing.includes(this)) {
 					return;
 				}
@@ -12982,6 +12949,9 @@ export class Library {
 						game.saveConfig("tmp_owner_roomId");
 						game.saveConfig("tmp_user_roomId");
 						game.saveConfig("reconnect_info");
+						break;
+					case "capacity":
+						alert("大厅容量已满或公开配置过大，请稍后重试或减少房间设置。");
 						break;
 					case "offline":
 						if (_status.paused && _status.event.name == "game") {

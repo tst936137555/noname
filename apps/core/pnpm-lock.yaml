@@ -59,9 +59,6 @@ importers:
       '@noname/fs':
         specifier: workspace:*
         version: link:../../packages/fs
-      '@noname/jit':
-        specifier: workspace:*
-        version: link:../../packages/jit
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2

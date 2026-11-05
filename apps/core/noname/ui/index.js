@@ -440,8 +440,10 @@ export class UI {
 		if (!ui.handcards1Container.childNodes.length) {
 			return;
 		}
-		var hs1 = [],
-			hs2 = [];
+		/** @type {(Card & {_transform?: string})[]} */
+		var hs1 = [];
+		/** @type {(Card & {_transform?: string})[]} */
+		var hs2 = [];
 		for (var i = 0; i < ui.handcards1Container.firstChild.childElementCount; i++) {
 			if (!ui.handcards1Container.firstChild.childNodes[i].classList.contains("removing")) {
 				hs1.push(ui.handcards1Container.firstChild.childNodes[i]);
@@ -470,6 +472,7 @@ export class UI {
 			offset12 = 100 - offset1;
 		}
 		var spread1 = ui.getSpreadOffset(hs1, { currentMargin: offset1 });
+		const infoWidths1 = hs1.map(node => node.node.info.offsetWidth);
 		for (var i = 0; i < hs1.length; i++) {
 			var x1 = i * offset1;
 			if (spread1.spreadLeft || spread1.spreadRight) {
@@ -479,11 +482,9 @@ export class UI {
 			var baseTransform1 = "translateX(" + x1 + "px)";
 			hs1[i]._transform = baseTransform1;
 			hs1[i].style.transform = hs1[i].classList.contains("selected") ? baseTransform1 + " translateY(-20px)" : baseTransform1;
-			ui.refresh(hs1[i]);
-			hs1[i].classList.remove("drawinghidden");
 			if (offset12 > 40) {
-				offset12 = 90 - hs1[i].node.info.offsetWidth;
-				hs1[i].node.info.querySelector("span").style.display = "none";
+				offset12 = 90 - infoWidths1[i];
+				hs1[i].node.info.querySelector("span")?.style.setProperty("display", "none");
 				if (hs1[i].node.name.classList.contains("long")) {
 					hs1[i].node.name.style.transform = "translateY(16px)  scale(0.85)";
 					hs1[i].node.name.style.transformOrigin = "top left";
@@ -492,13 +493,15 @@ export class UI {
 				}
 				hs1[i].node.info.style.transform = "translateX(-" + offset12 + "px) translateY(-3px)";
 			} else {
-				hs1[i].node.info.querySelector("span").style.display = "";
+				hs1[i].node.info.querySelector("span")?.style.setProperty("display", "");
 				hs1[i].node.name.style.transform = "";
 				hs1[i].node.name.style.transformOrigin = "";
 				hs1[i].node.info.style.transform = "translateX(-" + offset12 + "px)";
 			}
 		}
 		ui.handcards1Container.firstChild.style.width = offset1 * (hs1.length - 1) + 118 + (spread1.spreadLeft + spread1.spreadRight) + "px";
+		if (hs1.length) ui.refresh(hs1[0]);
+		for (const node of hs1) node.classList.remove("drawinghidden");
 
 		var offset2,
 			offset22 = 0;
@@ -518,6 +521,7 @@ export class UI {
 			offset22 = 100 - offset2;
 		}
 		var spread2 = ui.getSpreadOffset(hs2, { currentMargin: offset2 });
+		const infoWidths2 = hs2.map(node => node.node.info.offsetWidth);
 		for (var i = 0; i < hs2.length; i++) {
 			var x2 = i * offset2;
 			if (spread2.spreadLeft || spread2.spreadRight) {
@@ -527,11 +531,9 @@ export class UI {
 			var baseTransform2 = "translateX(" + x2 + "px)";
 			hs2[i]._transform = baseTransform2;
 			hs2[i].style.transform = hs2[i].classList.contains("selected") ? baseTransform2 + " translateY(-20px)" : baseTransform2;
-			ui.refresh(hs2[i]);
-			hs2[i].classList.remove("drawinghidden");
 			if (offset22 > 40) {
-				offset22 = 90 - hs2[i].node.info.offsetWidth;
-				hs2[i].node.info.querySelector("span").style.display = "none";
+				offset22 = 90 - infoWidths2[i];
+				hs2[i].node.info.querySelector("span")?.style.setProperty("display", "none");
 				if (hs2[i].node.name.classList.contains("long")) {
 					hs2[i].node.name.style.transform = "translateY(16px)  scale(0.85)";
 					hs2[i].node.name.style.transformOrigin = "top left";
@@ -540,13 +542,15 @@ export class UI {
 				}
 				hs2[i].node.info.style.transform = "translateX(-" + offset22 + "px) translateY(-3px)";
 			} else {
-				hs2[i].node.info.querySelector("span").style.display = "";
+				hs2[i].node.info.querySelector("span")?.style.setProperty("display", "");
 				hs2[i].node.name.style.transform = "";
 				hs2[i].node.name.style.transformOrigin = "";
 				hs2[i].node.info.style.transform = "translateX(-" + offset22 + "px)";
 			}
 		}
 		ui.handcards2Container.firstChild.style.width = offset2 * (hs2.length - 1) + 118 + (spread2.spreadLeft + spread2.spreadRight) + "px";
+		if (hs2.length) ui.refresh(hs2[0]);
+		for (const node of hs2) node.classList.remove("drawinghidden");
 	}
 	updateh(compute) {
 		if (!game.me) {

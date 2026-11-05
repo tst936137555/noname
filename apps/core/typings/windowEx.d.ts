@@ -1,5 +1,6 @@
 //一些附加到window的对象的提示
 declare interface Window {
+	Capacitor?: { isNativePlatform?: () => boolean };
 	nonameDesktop?: { legacyDirectory?: string; exit(): Promise<void>; host?: { ip: string; start(): Promise<void>; send(id: string, data: string): void; close(id: string): void; onEvent(callback: (event: { type: string; id: string; data?: string }) => void): () => void } };
 	/** 初始界面的暂时配置？ */
 	tempSetNoname?: string;

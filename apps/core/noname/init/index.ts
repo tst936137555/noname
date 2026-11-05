@@ -1,4 +1,5 @@
-import { importSave, validateSave } from "@/util/save.js";
+import { migrateLegacySave } from "@/util/save.js";
+import { confirmReset } from "@/util/reset.js";
 /// <reference types="vite/client" />
 import gamePackage from "../../package.json";
 import { rootURL, lib, game, get, _status, ui, ai } from "noname";
@@ -68,7 +69,7 @@ export async function boot() {
 		await import("./compatible.js");
 	}
 
-	const sandboxEnabled = !config.get("debug") && !get.is.safari();
+	const sandboxEnabled = true;
 
 	// 初始化沙盒的Realms
 	await initializeSandboxRealms(sandboxEnabled);
@@ -296,10 +297,10 @@ export async function boot() {
 		contentTasks.push({ label: "武将资料", load: () => lib.init.promises.js(`${lib.assetURL}character`, name) });
 	}
 	for (const path of startupImages) {
-		toLoad.push({ label: "界面素材", load: () => preloadImage(lib.assetURL + path), optional: true });
+		toLoad.push({ label: `界面素材:${path}`, load: () => preloadImage(lib.assetURL + path), optional: true });
 	}
 	for (const font of ["xinwei", "huangcao", "NonameSuits"]) {
-		toLoad.push({ label: "界面字体", load: () => preloadFont(font), optional: true });
+		toLoad.push({ label: `界面字体:${font}`, load: () => preloadFont(font), optional: true });
 	}
 
 	// 有任务完成就刷新超时计时，避免慢设备在正常预加载时被反复要求重启。
@@ -681,14 +682,26 @@ async function loadConfig() {
 	}
 
 	const event = await new Promise<Event>((resolve, reject) => {
+		let abandoned = false;
 		const idbOpenDBRequest = window.indexedDB.open(`${lib.configprefix}data`, 4);
 		idbOpenDBRequest.onerror = () => reject(idbOpenDBRequest.error);
-		idbOpenDBRequest.onblocked = () => reject(new Error("数据库升级被其他窗口阻塞，请关闭其他游戏窗口后重试"));
+		idbOpenDBRequest.onblocked = () => {
+			abandoned = true;
+			reject(new Error("数据库升级被其他窗口阻塞，请关闭其他游戏窗口后重试"));
+		};
 		idbOpenDBRequest.onsuccess = event => {
+			if (abandoned) {
+				idbOpenDBRequest.result.close();
+				return;
+			}
 			idbOpenDBRequest.result.onversionchange = () => idbOpenDBRequest.result.close();
 			resolve(event);
 		};
 		idbOpenDBRequest.onupgradeneeded = idbVersionChangeEvent => {
+			if (abandoned) {
+				idbOpenDBRequest.transaction?.abort();
+				return;
+			}
 			// @ts-expect-error MaybeHave
 			const idbDatabase = idbVersionChangeEvent.target.result;
 			if (!idbDatabase.objectStoreNames.contains("video")) {
@@ -716,24 +729,22 @@ async function loadConfig() {
 
 	if (hasConfigTxt) {
 		try {
-			const configStr = await game.promises.readFileAsText("noname.config.txt");
-
-			const save = validateSave(JSON.parse(lib.init.decode(configStr)));
-			const hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(configStr))), byte => byte.toString(16).padStart(2, "0")).join("");
-			const marker = lib.configprefix + "legacy_config_import";
-			if (localStorage.getItem(marker) !== hash) {
-				await importSave(lib.db, save);
-				localStorage.setItem(marker, hash);
-			}
-			result = await game.getDB("config");
-		} catch (e) {
-			console.error(e);
-			result = {};
+			const hash = await migrateLegacySave({
+				db: lib.db,
+				text: await game.promises.readFileAsText("noname.config.txt"),
+				decode: text => lib.init.decode(text),
+				previousHash: localStorage.getItem(lib.configprefix + "legacy_config_import"),
+				onWarning: error => {
+					console.warn("旧配置未导入，继续使用已有存档", error);
+				},
+			});
+			if (hash) localStorage.setItem(lib.configprefix + "legacy_config_import", hash);
+		} catch (error) {
+			console.warn("旧配置读取失败，继续使用已有存档", error);
 		}
 		lib.init.background();
-	} else {
-		result = await game.getDB("config");
 	}
+	result = await game.getDB("config");
 
 	if (!result || typeof result !== "object" || Array.isArray(result)) result = {};
 	for (const [key, expected] of Object.entries(lib.config)) {
@@ -835,93 +846,41 @@ function setBackground() {
 
 function setWindowListener() {
 	window.onkeydown = function (e) {
-		if (typeof ui.menuContainer == "undefined" || !ui.menuContainer.classList.contains("hidden")) {
-			if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r")) {
-				if (e.shiftKey) {
-					if (confirm("是否重置游戏？")) {
-						const noname_inited = localStorage.getItem("noname_inited");
-						const onlineKey = localStorage.getItem(lib.configprefix + "key");
-						localStorage.clear();
-						if (noname_inited) {
-							localStorage.setItem("noname_inited", noname_inited);
-						}
-						if (onlineKey) {
-							localStorage.setItem(lib.configprefix + "key", onlineKey);
-						}
-						if (indexedDB) {
-							indexedDB.deleteDatabase(lib.configprefix + "data");
-						}
-						game.reload();
-						return;
-					}
-				} else {
-					game.reload();
-				}
-			} else if (e.key.toLowerCase() === "s" && (e.ctrlKey || e.metaKey)) {
-				if (typeof window.saveNonameInput == "function") {
-					window.saveNonameInput();
-				}
-				e.preventDefault();
-				e.stopPropagation();
-				return false;
-			} else if (e.key.toLowerCase() === "j" && (e.ctrlKey || e.metaKey) && typeof lib.node != "undefined") {
-				lib.node.debug();
-			}
-		} else {
+		if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
+		const editable = e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]');
+		const modified = e.ctrlKey || e.metaKey;
+		const key = e.key.toLowerCase();
+		if (editable && !(modified && key === "s")) return;
+		if (e.key === "F5" || (modified && key === "r")) {
+			e.preventDefault();
+			if (e.shiftKey) void confirmReset(lib, game);
+			else game.reload();
+			return;
+		}
+		if (modified && key === "s") {
+			window.saveNonameInput?.();
+			e.preventDefault();
+			return;
+		}
+		if (modified && key === "j") {
+			if (typeof lib.node?.debug === "function") lib.node.debug();
+			return;
+		}
+		if (modified || e.altKey || !ui.menuContainer?.classList.contains("hidden")) return;
+		if (e.key === "Escape") {
 			game.closePopped();
-			const dialogs = document.querySelectorAll("#window>.dialog.popped:not(.static)");
-			for (let i = 0; i < dialogs.length; i++) {
-				// @ts-expect-error ignore
-				dialogs[i].delete();
-			}
-			if (e.key == "Space") {
-				const node = ui.window.querySelector("pausedbg");
-				if (node) {
-					node.click();
-				} else {
-					ui.click.pause();
-				}
-			} else if (e.key.toLowerCase() === "a") {
-				if (typeof ui.auto != "undefined") {
-					ui.auto.click();
-				}
-			} else if (e.key.toLowerCase() === "w") {
-				if (typeof ui.wuxie != "undefined" && ui.wuxie.style.display != "none") {
-					ui.wuxie.classList.toggle("glow");
-				} else if (typeof ui.tempnowuxie != "undefined") {
-					ui.tempnowuxie.classList.toggle("glow");
-				}
-			} else if (e.key === "F5" || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r")) {
-				if (e.shiftKey) {
-					if (confirm("是否重置游戏？")) {
-						const noname_inited = localStorage.getItem("noname_inited");
-						const onlineKey = localStorage.getItem(lib.configprefix + "key");
-						localStorage.clear();
-						if (noname_inited) {
-							localStorage.setItem("noname_inited", noname_inited);
-						}
-						if (onlineKey) {
-							localStorage.setItem(lib.configprefix + "key", onlineKey);
-						}
-						if (indexedDB) {
-							indexedDB.deleteDatabase(lib.configprefix + "data");
-						}
-						game.reload();
-						return;
-					}
-				} else {
-					game.reload();
-				}
-			} else if (e.key.toLowerCase() === "s" && (e.ctrlKey || e.metaKey)) {
-				e.preventDefault();
-				e.stopPropagation();
-				return false;
-			} else if (e.key.toLowerCase() === "j" && (e.ctrlKey || e.metaKey) && typeof lib.node != "undefined") {
-				lib.node.debug();
-			}
-			// else if(e.key=="Escape"){
-			// 	if(!ui.arena.classList.contains('paused')) ui.click.config();
-			// }
+			return;
+		}
+		if (e.key === " ") {
+			e.preventDefault();
+			const node = ui.window.querySelector("pausedbg");
+			if (node) node.click();
+			else ui.click.pause();
+		} else if (key === "a") {
+			ui.auto?.click();
+		} else if (key === "w") {
+			if (ui.wuxie && ui.wuxie.style.display !== "none") ui.wuxie.classList.toggle("glow");
+			else ui.tempnowuxie?.classList.toggle("glow");
 		}
 	};
 

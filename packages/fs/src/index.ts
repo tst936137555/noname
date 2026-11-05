@@ -90,6 +90,10 @@ export default function createApp(config: Partial<typeof defaultConfig> = {}) {
 		dotfiles: "allow",
 		allowedPath: (_path, _root, request) => !request.url.split(/[/?]/).some(part => ["home", ".git"].includes(decodeURIComponent(part).toLowerCase())),
 		maxAge: 0,
+		setHeaders(response, filePath) {
+			if (/[\\/]chunks[\\/][^\\/]+-[\w-]{8,}\.js$/.test(filePath)) response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+			else response.setHeader("Cache-Control", "no-cache");
+		},
 	});
 
 	// index.html

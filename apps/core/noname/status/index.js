@@ -3,6 +3,12 @@ import PauseManager from "@/game/PauseManager.ts";
 import { GameEventManager } from "@/library/element/gameEvent.js";
 
 export class status {
+	/** @type {((connected: boolean) => void) | undefined} */
+	connectCallback;
+	/** @type {(() => void) | undefined} */
+	connectClientsCallback;
+	/** @type {(() => void) | undefined} */
+	connectEventsCallback;
 	imchoosing = false;
 	auto = false;
 	eventManager = new GameEventManager();

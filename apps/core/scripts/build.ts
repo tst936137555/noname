@@ -32,15 +32,18 @@ async function main() {
 	 */
 	const importMap: Record<string, string> = {
 		noname: "/noname.js",
-		vue: "vue/dist/vue.esm-browser.js",
-		"pinyin-pro": "pinyin-pro",
-		dedent: "dedent",
+		vue: "/vendor/vue.esm-browser.prod.js",
+		"pinyin-pro": "/vendor/index.mjs",
+		dedent: "/vendor/dedent.mjs",
 	};
 
 	/**
 	 * 本体编译过程需要直接复制的文件
 	 */
 	const staticModules: Target[] = [
+		{ src: "node_modules/vue/dist/vue.esm-browser.prod.js", dest: "vendor" },
+		{ src: "node_modules/pinyin-pro/dist/index.mjs", dest: "vendor" },
+		{ src: "node_modules/dedent/dist/dedent.mjs", dest: "vendor" },
 		{ src: "layout", dest: "" },
 		{ src: "font", dest: "" },
 		{ src: "theme", dest: "" },
@@ -137,8 +140,11 @@ async function buildSelf(target: string | string[], importMap: Record<string, st
 	await build({
 		build: {
 			target,
-			sourcemap: false,
-			minify: false,
+			sourcemap: "hidden",
+			// Network callbacks are serialized with Function#toString; their engine
+			// global identifiers must survive compilation unchanged.
+			minify: "terser",
+			terserOptions: { compress: false, mangle: false, keep_fnames: true, keep_classnames: true },
 			rollupOptions: {
 				preserveEntrySignatures: "strict",
 				treeshake: false,
@@ -146,14 +152,25 @@ async function buildSelf(target: string | string[], importMap: Record<string, st
 				input: {
 					index: "index.html",
 					noname: "noname.js",
+					"noname/util/save": join(root, "noname/util/save.js"),
+					"noname/util/sandbox/initRealms": join(root, "noname/util/sandbox/initRealms.js"),
+					"noname/util/sandbox/sandbox": join(root, "noname/util/sandbox/sandbox.js"),
+					"noname/util/sandbox/error": join(root, "noname/util/sandbox/error.ts"),
+					"noname/entry": join(root, "noname/entry.ts"),
 				},
 				output: {
-					preserveModules: true, // 保留文件结构
-					preserveModulesRoot: "./",
+					preserveModules: false,
+					onlyExplicitManualChunks: true,
+					manualChunks(id) {
+						const file = id.replaceAll("\\", "/");
+						// Let Rollup place the engine's cyclic dependencies together. Realm
+						// entry points remain independent; only optional editor modules are grouped.
+						if (/\/(?:@codemirror|@lezer|eslint-linter-browserify|codemirror)[/@]/.test(file)) return "editor";
+					},
 
 					// 去掉 hash
 					entryFileNames: "[name].js", // 入口文件
-					chunkFileNames: "[name].js", // 代码分块
+					chunkFileNames: "chunks/[name]-[hash].js",
 					assetFileNames: "[name][extname]", // 静态资源
 				},
 				onwarn(warning, warn) {
@@ -207,7 +224,7 @@ function writeBuildInfo() {
 	const buildInfo: BuildInfo = {
 		channel,
 		commit,
-		builtAt: process.env.NONAME_BUILD_TIME || "unknown",
+		builtAt: process.env.NONAME_BUILD_TIME || new Date().toISOString(),
 	};
 	writeFileSync(join(root, "dist/game/build-info.json"), `${JSON.stringify(buildInfo, null, "\t")}\n`, "utf8");
 }

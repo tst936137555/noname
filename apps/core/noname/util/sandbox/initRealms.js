@@ -1,8 +1,8 @@
 import { CodeSnippet, ErrorReporter, ErrorManager } from "./error.ts";
 
 // 方便开关确定沙盒的问题喵
-// 当此处为true、debug模式未启用、设备非苹果时，沙盒生效
-let SANDBOX_ENABLED = false;
+// The isolated initialization frame must also enable its own realm implementation.
+let SANDBOX_ENABLED = Boolean(Reflect.get(window, "replacedGlobal"));
 
 // 如果要调试沙盒内代码需要开启，否则沙盒内部代码的断点和单步调试将不生效喵
 const SANDBOX_DEBUG = true;
@@ -49,6 +49,7 @@ async function initializeSandboxRealms(enabled) {
 		SANDBOX_ENABLED = false;
 		return;
 	}
+	SANDBOX_ENABLED = true;
 
 	const document = window.document;
 	const createElement = document.createElement.bind(document);

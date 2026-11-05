@@ -4,6 +4,20 @@ export interface MinimalFileSystem {
 	statEntry(options: { entryName: string }): Promise<{ type: EntryType }>;
 }
 
+type Failure = (error: unknown) => void;
+export interface LegacyFileSystemGame {
+	checkFile(fileName: string, callback?: (type: -1 | 0 | 1) => void, onerror?: Failure): void;
+	checkDir(dir: string, callback?: (type: -1 | 0 | 1) => void, onerror?: Failure): void;
+	readFile(fileName: string, callback?: (data: ArrayBuffer) => void, onerror?: Failure): void;
+	readFileAsText(fileName: string, callback?: (data: string) => void, onerror?: Failure): void;
+	writeFile(data: string | ArrayBuffer | ArrayBufferView | Blob, path: string, name: string, callback?: (error?: unknown) => void): void;
+	removeFile(fileName: string, callback?: (error?: unknown) => void, onerror?: Failure): void;
+	getFileList(dir: string, callback?: (folders: string[], files: string[]) => void, onerror?: Failure): void;
+	ensureDirectory(list: string | string[], callback?: () => void, file?: boolean): void;
+	createDir(directory: string, successCallback?: () => void, errorCallback?: Failure): void;
+	removeDir(directory: string, successCallback?: () => void, errorCallback?: Failure): void;
+}
+
 export function sanitizeExportName(name?: string) {
 	return (name || "noname").replace(/\\|\/|:|\?|"|\*|<|>|\|/g, "-");
 }
@@ -61,7 +75,7 @@ export function toTriState(type: "file" | "directory" | "none", expected: "file"
 	return type === expected ? EntryType.ENTRY_EXPECTED : EntryType.ENTRY_NOT_EXPECTED;
 }
 
-export function callbackError(callback: Function | undefined, error: unknown) {
+export function callbackError(callback: Failure | undefined, error: unknown) {
 	if (typeof callback == "function") {
 		callback(error instanceof Error ? error : new Error(String(error)));
 	}

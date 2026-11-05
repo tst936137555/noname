@@ -9,7 +9,8 @@ await build({
 	build: {
 		target,
 		sourcemap: false,
-		minify: false,
+		minify: "terser",
+		terserOptions: { compress: false, mangle: false, keep_fnames: true, keep_classnames: true },
 		outDir: `dist/${type}`,
 		rollupOptions: {
 			preserveEntrySignatures: "strict",

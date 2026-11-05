@@ -1,6 +1,7 @@
-let url = new URL(/* @vite-ignore */"./", import.meta.url);
+// Bundled engine chunks may live below chunks/; resources belong to the document root.
+let url = new URL("./", document.baseURI);
 if (!url.href.endsWith("/")) {
-    url = new URL(url.href + "/");
+	url = new URL(url.href + "/");
 }
 export const rootURL = url;
 

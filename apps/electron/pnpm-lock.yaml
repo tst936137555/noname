@@ -11,9 +11,6 @@ importers:
       '@electron/get':
         specifier: ^4.0.2
         version: 4.0.2
-      '@electron/remote':
-        specifier: ^2.1.3
-        version: 2.1.3(electron@39.5.2)
       '@noname/fs':
         specifier: workspace:*
         version: link:../../packages/fs

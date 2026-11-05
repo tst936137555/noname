@@ -1,5 +1,8 @@
 import { ui, game, get, lib, _status } from "noname";
 import { fitMenu } from "./geometry.js";
+import { accessibleButton, bindDialog } from "../../accessibility.js";
+
+const containerFor = node => node.closest(".popup-container");
 
 export function openMenu(node, anchor, onclose, container = popupContainer) {
 	container.replaceChildren(node);
@@ -28,6 +31,7 @@ export function openMenu(node, anchor, onclose, container = popupContainer) {
 	});
 	node.style.left = position.left + "px";
 	node.style.top = position.top + "px";
+	node.querySelector('[tabindex="0"]')?.focus();
 }
 export function clickToggle() {
 	if (this.classList.contains("disabled")) {
@@ -105,6 +109,7 @@ export function createMenu(connectMenu, tabs, config) {
 		menuContainer.classList.add("centermenu");
 	}
 	var menuTab = ui.create.div(".menu-tab", menu);
+	menuTab.setAttribute("role", "tablist");
 	var menuContent = ui.create.div(".menu-content", menu);
 	var clickTab = function () {
 		if (this.classList.contains("disabled")) {
@@ -116,6 +121,7 @@ export function createMenu(connectMenu, tabs, config) {
 			active._link.remove();
 		}
 		this.classList.add("active");
+		for (const tab of Array.from(menuTab.children)) tab.setAttribute("aria-selected", String(tab.classList.contains("active")));
 		menuContent.appendChild(this._link);
 	};
 	ui.click.menuTab = function (tab) {
@@ -131,7 +137,10 @@ export function createMenu(connectMenu, tabs, config) {
 		var active = i === (config.init || 0);
 		pages[i] = createPage(active ? menuContent : null);
 		pages[i].dataset.menuTab = tabs[i];
-		ui.create.div(active ? ".active" : "", tabs[i], menuTab, clickTab)._link = pages[i];
+		const tab = ui.create.div(active ? ".active" : "", tabs[i], menuTab, clickTab);
+		tab._link = pages[i];
+		accessibleButton(tab, clickTab, "tab");
+		tab.setAttribute("aria-selected", String(active));
 	}
 	return {
 		menu: menu,
@@ -199,6 +208,10 @@ export function createConfig(config, position) {
 					visualMenu._link = i;
 					if (config.visualMenu(visualMenu, i, config.item[i] || i, config) !== false) {
 						visualMenu.listen(clickMenuItem);
+						accessibleButton(visualMenu, () => {
+							clickMenuItem.call(visualMenu);
+							containerFor(visualMenu)?.click();
+						});
 					}
 					visualMenu.update = updateVisual;
 				};
@@ -234,8 +247,12 @@ export function createConfig(config, position) {
 				node._link.menu.updateBr();
 			} else {
 				for (var i in config.item) {
-					var textMenu = ui.create.div("", config.item[i] || i, node._link.menu, clickMenuItem);
+					const textMenu = ui.create.div("", config.item[i] || i, node._link.menu, clickMenuItem);
 					textMenu._link = i;
+					accessibleButton(textMenu, () => {
+						clickMenuItem.call(textMenu);
+						containerFor(textMenu)?.click();
+					});
 					if (config.textMenu) {
 						config.textMenu(textMenu, i, config.item[i] || i, config);
 					}
@@ -305,6 +322,21 @@ export function createConfig(config, position) {
 		ui.create.div(ui.create.div(node));
 		if (config.init == true) {
 			node.classList.add("on");
+		}
+	}
+	if (!config.input && !node.querySelector("button, input")) {
+		const action = config.item ? clickSwitcher : clickToggle;
+		accessibleButton(node, action, node.classList.contains("toggle") && !config.clear ? "switch" : "button");
+		if (config.item) {
+			node.setAttribute("aria-haspopup", "dialog");
+			node._link.menu.addEventListener("keydown", event => {
+				if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+				event.preventDefault();
+				const items = [...node._link.menu.querySelectorAll('[tabindex="0"]')];
+				const index = items.indexOf(document.activeElement);
+				const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
+				items[next]?.focus();
+			});
 		}
 	}
 	if (position) {
@@ -398,6 +430,8 @@ export function menu(connectMenu) {
 		}
 	}));
 	cacheMenuContainer._popupContainer = cachePopupContainer;
+	bindDialog(cacheMenuContainer, "游戏设置", () => clickContainer.call(cacheMenuContainer, connectMenu));
+	bindDialog(cachePopupContainer, "选择设置", () => cachePopupContainer.click());
 
 	if (!connectMenu) {
 		ui.menuContainer = cacheMenuContainer;
