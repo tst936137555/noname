@@ -122,6 +122,8 @@ jobs:
                   java-version: "21"
                   cache: gradle
             - uses: android-actions/setup-android@v3
+              with:
+                  packages: platform-tools
             - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
             - run: chmod +x apps/mobile/native/android/gradlew
             - run: pnpm -F @noname/mobile build:android --variant=debug --skip-web-build
