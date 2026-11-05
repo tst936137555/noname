@@ -3715,6 +3715,7 @@ else if (entry[1] !== void 0) stringifying[key] = JSON.stringify(entry[1]);*/
 		}
 		n = game.checkMod(from, to, n, "globalFrom", from);
 		n = game.checkMod(from, to, n, "globalTo", to);
+		let attackModifier = 0;
 		const equips1 = from.getVCards("e", function (card) {
 				return !card.cards?.some(card => {
 					return ui.selected.cards?.includes(card);
@@ -3743,11 +3744,11 @@ else if (entry[1] !== void 0) stringifying[key] = JSON.stringify(entry[1]);*/
 				n += info.globalTo;
 			}
 			if (info.attackTo) {
-				m += info.attackTo;
+				attackModifier += info.attackTo;
 			}
 		}
 		if (method == "attack") {
-			let m = n;
+			let m = n + attackModifier;
 			m = game.checkMod(from, to, m, "attackFrom", from);
 			m = game.checkMod(from, to, m, "attackTo", to);
 			return m;

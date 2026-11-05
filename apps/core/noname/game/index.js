@@ -2381,7 +2381,7 @@ export class Game {
 
 		const newTicksMap = ticksMap ?? {};
 		const newSkillTicks = newTicksMap[skill] ?? (newTicksMap[skill] = {});
-		newSkillTicks[sync] ??= Date.now();
+		newSkillTicks[sync] = Date.now();
 		game.#skillSyncTicks.set(player, newTicksMap);
 
 		// 执行并返回喵
@@ -10240,7 +10240,7 @@ export class Game {
 			});
 		}
 		//初始化history和stat
-		player.actionHistory = new Array(players[0].actionHistory.length).fill({
+		player.actionHistory = Array.from({ length: players[0].actionHistory.length }, () => ({
 			useCard: [],
 			respond: [],
 			skipped: [],
@@ -10250,7 +10250,7 @@ export class Game {
 			damage: [],
 			custom: [],
 			useSkill: [],
-		});
+		}));
 		for (let i = 0; i < players[0].actionHistory.length; i++) {
 			["isRound", "isSkipped"].forEach(key => {
 				if (players[0].actionHistory[i][key]) {
@@ -10258,11 +10258,11 @@ export class Game {
 				}
 			});
 		}
-		player.stat = new Array(players[0].stat.length).fill({
-			card: {},
+		player.stat = Array.from({ length: players[0].stat.length }, () => ({
+			card: Object.create(null),
 			skill: {},
 			triggerSkill: {},
-		});
+		}));
 		for (let i = 0; i < players[0].stat.length; i++) {
 			["isRound", "isSkipped"].forEach(key => {
 				if (players[0].stat[i][key]) {

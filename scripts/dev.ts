@@ -1,3 +1,11 @@
-import { spawn } from "node:child_process";
-spawn("pnpm -F @noname/fs dev --debug --dirname=../../apps/core", { shell: true });
-spawn("pnpm -F noname dev --open", { shell: true });
+import concurrently from "concurrently";
+const { result } = concurrently(
+	[
+		{ command: "pnpm -F @noname/fs dev --debug --dirname=../../apps/core", name: "files" },
+		{ command: "pnpm -F noname dev --open", name: "game" },
+	],
+	{ killOthersOn: ["failure", "success"], prefix: "name" }
+);
+result.catch(() => {
+	process.exitCode = 1;
+});

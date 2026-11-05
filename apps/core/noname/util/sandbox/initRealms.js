@@ -5,7 +5,7 @@ import { CodeSnippet, ErrorReporter, ErrorManager } from "./error.ts";
 let SANDBOX_ENABLED = Boolean(Reflect.get(window, "replacedGlobal"));
 
 // 如果要调试沙盒内代码需要开启，否则沙盒内部代码的断点和单步调试将不生效喵
-const SANDBOX_DEBUG = true;
+const SANDBOX_DEBUG = false;
 
 // 执行上下文传递函数，请勿动喵
 // 用于传递顶级execute context

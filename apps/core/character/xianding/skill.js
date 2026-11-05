@@ -655,7 +655,6 @@ const skills = {
 			if (!list.length) return false;
 			const result = await player
 				.chooseTarget({
-					prompt: get.prompt("dcsbqingshi"),
 					prompt: "视为对一名其他角色使用【杀】，若造成伤害，结束阶段其可以对你使用【杀】。",
 					selectTarget: 1,
 					list,

@@ -207,3 +207,17 @@ export function simplifyConfig(config) {
 		config.mode_config.versus.versus_mode = "two";
 	}
 }
+
+/** Initialize runtime settings before a mode starts, independently of lazy menus. */
+export function initializeModeConfig(config, definitions) {
+	for (const mode of modes) {
+		const values = config.mode_config[mode];
+		for (const [key, value] of Object.entries(config.mode_config.global)) if (!(key in values)) values[key] = structuredClone(value);
+		for (const [key, definition] of Object.entries(definitions[mode]?.config || {})) {
+			if (!definition || typeof definition !== "object" || !("init" in definition)) continue;
+			const fallback = definition.init;
+			const value = values[key];
+			if (!(key in values) || (fallback !== null && typeof value !== typeof fallback) || (definition.item && !(value in definition.item))) values[key] = structuredClone(fallback);
+		}
+	}
+}

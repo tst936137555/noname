@@ -44,7 +44,7 @@ export async function packageWindows(source, output, version, archiver) {
 		if (result.status !== 0) throw new Error(`Windows ZIP failed: ${result.status}`);
 	};
 	try {
-		run(["a", "-tzip", "-mx=3", temporary, "noname"]);
+		run(["a", "-tzip", "-mx=3", "-mcu=on", temporary, "noname"]);
 		run(["t", temporary]);
 		const hash = createHash("sha256");
 		for await (const chunk of createReadStream(temporary)) hash.update(chunk);

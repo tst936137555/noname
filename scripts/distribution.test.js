@@ -32,6 +32,8 @@ test("Windows ZIP 解压后只有 noname 顶层目录并包含启动程序和游
 	await mkdir(join(source, "resources/app"), { recursive: true });
 	await writeFile(join(source, "noname.exe"), "test-runtime");
 	await writeFile(join(source, "resources/app/noname.js"), "test-game");
+	await writeFile(join(source, "resources/app/dc_zhangyì.mp3"), "unicode-resource");
+	await writeFile(join(source, "resources/app/语音.mp3"), "unicode-resource");
 	const app = createRequire(new URL("../apps/electron/package.json", import.meta.url));
 	const builder = createRequire(app.resolve("electron-builder"));
 	const packager = createRequire(builder.resolve("app-builder-lib"));
@@ -41,6 +43,18 @@ test("Windows ZIP 解压后只有 noname 顶层目录并包含启动程序和游
 	assert.ok(list.includes("Path = noname/noname.exe"));
 	assert.ok(list.includes("Path = noname/resources/app/noname.js"));
 	assert.ok((await readFile(archive + ".sha256", "utf8")).includes("noname.windows.1.2.3.zip"));
+	const zip = await readFile(archive);
+	let unicodeEntries = 0;
+	for (let offset = zip.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02])); offset >= 0 && zip.readUInt32LE(offset) === 0x02014b50;) {
+		const length = zip.readUInt16LE(offset + 28);
+		const name = zip.subarray(offset + 46, offset + 46 + length).toString("utf8");
+		if (Array.from(name).some(character => character.charCodeAt(0) > 127)) {
+			assert.ok(zip.readUInt16LE(offset + 8) & 0x800, "Unicode names require the ZIP UTF-8 flag");
+			unicodeEntries++;
+		}
+		offset += 46 + length + zip.readUInt16LE(offset + 30) + zip.readUInt16LE(offset + 32);
+	}
+	assert.equal(unicodeEntries, 2);
 });
 
 test("全量包保留所有代码、图片、字体和音频，并清理旧产物", async t => {

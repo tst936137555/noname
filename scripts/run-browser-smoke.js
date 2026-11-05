@@ -8,7 +8,7 @@ const profile = await mkdtemp(join(tmpdir(), "noname-smoke-"));
 if (!resolve(profile).startsWith(resolve(tmpdir()) + sep)) throw new Error("Invalid temporary profile");
 const env = { ...process.env, NONAME_SMOKE_PROFILE: profile };
 delete env.ELECTRON_RUN_AS_NODE;
-const child = spawn(require("electron"), ["scripts/browser-smoke.cjs", "--disable-gpu"], { stdio: "inherit", windowsHide: true, env });
+const child = spawn(require("electron"), [process.argv.includes("--modes") ? "scripts/mode-smoke.cjs" : "scripts/browser-smoke.cjs", "--disable-gpu"], { stdio: "inherit", windowsHide: true, env });
 const timer = setTimeout(() => {
 	console.error("Browser smoke timeout");
 	child.kill();

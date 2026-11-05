@@ -72,7 +72,7 @@ app.whenReady()
 			}
 			const state = await win.webContents.executeJavaScript('({arena:!!document.querySelector("#arena"),loading:!document.querySelector("#startup-loading").hidden, status:document.querySelector(".startup-status").textContent,splash:document.querySelector("#splash")?.className,inSplash:window.inSplash})');
 			console.log("SMOKE_GAME", JSON.stringify(state));
-			if(await win.webContents.executeJavaScript('(async()=>{const {game,get}=await import("/noname.js");return Boolean(get.config("free_choose"))})()')) throw new Error("Free character choice enabled by default");
+			if (await win.webContents.executeJavaScript('(async()=>{const {game,get}=await import("/noname.js");return Boolean(get.config("free_choose"))})()')) throw new Error("Free character choice enabled by default");
 			if (!state.arena || state.loading) throw new Error("Game failed to enter");
 			await win.webContents.executeJavaScript(`(async()=>{
     const {ui,lib,game,get,_status}=await import('/noname.js');
@@ -121,7 +121,7 @@ app.whenReady()
 
   })()`);
 			console.log("SMOKE_INTERACTION_ISOLATION_OK");
-            const clarity = await win.webContents.executeJavaScript(`(async()=>{
+			const clarity = await win.webContents.executeJavaScript(`(async()=>{
               const {lib,game,ui,get}=await import('/noname.js');
               const missing=Object.entries(lib.character).flatMap(([name,c])=>(c.skills||c[3]||[]).filter(skill=>!lib.skill[skill]).map(skill=>name+':'+skill));
               if(missing.length)throw new Error('Missing character skills: '+missing.join(','));
@@ -143,9 +143,19 @@ app.whenReady()
               const rect=fixture.getBoundingClientRect();
               return {fixtureStyle:{display:getComputedStyle(fixture).display,visibility:getComputedStyle(fixture).visibility,opacity:getComputedStyle(fixture).opacity,parent:fixture.parentElement.id,equipmentHeight:equips.getBoundingClientRect().height,cards:[...equips.children].map(c=>({text:c.node?.name2?.textContent,visibility:getComputedStyle(c).visibility,display:getComputedStyle(c).display,opacity:getComputedStyle(c).opacity,top:c.getBoundingClientRect().top}))},missingSkills:missing.length,equipmentScale:getComputedStyle(equips).transform,rect:{x:Math.floor(rect.x)-5,y:Math.floor(rect.y)-5,width:Math.ceil(rect.width)+10,height:Math.ceil(rect.height)+10}};
             })()`);
-            fs.writeFileSync('output/equipment-clarity.png',(await win.webContents.capturePage()).toPNG());
-            console.log('SMOKE_CONTENT_CLARITY',JSON.stringify(clarity));
+			fs.writeFileSync("output/equipment-clarity.png", (await win.webContents.capturePage()).toPNG());
+			console.log("SMOKE_CONTENT_CLARITY", JSON.stringify(clarity));
 
+			const lifecycle = await win.webContents.executeJavaScript(`(async()=>{
+ const {lib,_status}=await import('/noname.js');const before=document.querySelectorAll('iframe').length;
+ const previous={node:lib.node,players:lib.playerOL,waiting:_status.waitingForPlayer};
+ lib.node={clients:[],observing:[]};lib.playerOL={};_status.waitingForPlayer=false;
+ try{for(let i=0;i<20;i++){const client=new lib.element.Client({wsid:'lifecycle-'+i});lib.node.clients.push(client);client.close();client.close();}
+ if(lib.node.clients.length||document.querySelectorAll('iframe').length!==before)throw Error('Closed connections retained realms');
+ return {before,after:document.querySelectorAll('iframe').length};
+ }finally{lib.node=previous.node;lib.playerOL=previous.players;_status.waitingForPlayer=previous.waiting;}
+ })()`);
+			console.log("SMOKE_LIFECYCLE", JSON.stringify(lifecycle));
 			const pageErrors = await win.webContents.executeJavaScript("window.__smokeErrors");
 			if (pageErrors.length) throw new Error("Unexpected browser errors: " + pageErrors.join(" | "));
 			win.webContents.session.webRequest.onBeforeRequest({ urls: [address + "/noname/entry.js*"] }, (_details, callback) => callback({ cancel: true }));

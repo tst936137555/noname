@@ -72,6 +72,7 @@ export class Client {
 	 */
 	inited;
 	close() {
+		if (this.closed) return this;
 		lib.node.clients.remove(this);
 		lib.node.observing.remove(this);
 		if (ui.removeObserve && !lib.node.observing.length) {

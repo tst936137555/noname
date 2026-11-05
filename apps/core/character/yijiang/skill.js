@@ -6452,10 +6452,7 @@ const skills = {
 			next.forceDie = true;
 			trigger.after.push(next);
 			next.setContent(async (event, trigger, player) => {
-				if (
-					player.isIn() &&
-					player.getHistory("sourceDamage", evt => evt.getParent(2) === event.parent).length > 0
-				) {
+				if (player.isIn() && player.getHistory("sourceDamage", evt => evt.getParent(2) === event.parent).length > 0) {
 					player.loseHp();
 				}
 				game.setNature(event.card, [], true);
@@ -7176,7 +7173,7 @@ const skills = {
 						return target !== get.event().source;
 					},
 					ai(target) {
-						const att = get.attitude(get.player(), target);
+						let att = get.attitude(get.player(), target);
 						const cards = target.getCards("h");
 						if (cards.length >= 2 && cards.some(card => card.name === "shan")) {
 							att /= 1.5;

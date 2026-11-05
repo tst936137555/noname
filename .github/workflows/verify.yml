@@ -1,51 +1,144 @@
-name: Verify Distribution
-
+name: Verify project
 on:
-    pull_request:
-        branches: [main]
     workflow_call:
+        inputs:
+            channel:
+                type: string
+                default: test
     workflow_dispatch:
-
 permissions:
     contents: read
-
+env:
+    ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+    NODE_OPTIONS: --max-old-space-size=6144
+    NONAME_BUILD_WORKERS: 2
 jobs:
-    verify:
-        runs-on: ubuntu-latest
+    checks:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 25
+        steps:
+            - uses: actions/checkout@v6
+            - uses: ./.github/actions/setup
+            - run: pnpm test
+            - run: pnpm lint
+            - run: pnpm lint:engineering
+            - run: pnpm -F @noname/fs build
+            - run: pnpm check:platforms
+            - run: pnpm check:types
+            - uses: actions/upload-artifact@v7
+              if: always()
+              with:
+                  name: type-diagnostics
+                  path: output/type-diagnostics.txt
+                  retention-days: 7
+    distribution:
+        needs: checks
+        runs-on: ubuntu-24.04
         timeout-minutes: 30
         steps:
             - uses: actions/checkout@v6
-            - uses: pnpm/action-setup@v5
-              with:
-                  version: 11.25.0
-            - uses: actions/setup-node@v6
-              with:
-                  node-version: 24
-                  cache: pnpm
-            - run: pnpm install --frozen-lockfile
-            - name: Check engineering boundaries
+            - uses: ./.github/actions/setup
+            - run: pnpm build
+              env:
+                  NONAME_BUILD_CHANNEL: ${{ inputs.channel || 'test' }}
+                  NONAME_BUILD_COMMIT: ${{ github.sha }}
+            - run: pnpm verify:assets
+            - run: pnpm -F @noname/server build
+            - run: pnpm -F @noname/electron build
+            - name: Prepare Chromium sandbox
               run: |
-                  pnpm test
-                  pnpm lint
-                  pnpm lint:engineering
-                  pnpm check:platforms
-                  pnpm check:types
-            - name: Build and verify full distribution
-              run: |
-                  pnpm build
-                  pnpm verify:assets
-                  pnpm -F @noname/electron build
                   SANDBOX_FILE=$(node -p "require('node:path').join(require('node:path').dirname(require('./apps/electron/node_modules/electron')), 'chrome-sandbox')")
                   test -f "$SANDBOX_FILE"
                   sudo chown root:root "$SANDBOX_FILE"
                   sudo chmod 4755 "$SANDBOX_FILE"
-                  xvfb-run -a pnpm test:browser
-            - name: Preserve verification diagnostics
-              if: always()
-              uses: actions/upload-artifact@v7
+            - run: xvfb-run -a pnpm test:browser
+            - run: xvfb-run -a pnpm test:modes
+            - name: Archive verified distribution
+              run: tar -cf output/noname-dist.tar dist
+            - uses: actions/upload-artifact@v7
               with:
-                  name: verification-${{ github.sha }}
+                  name: verified-distribution
+                  path: output/noname-dist.tar
+                  compression-level: 0
+                  retention-days: 3
+            - uses: actions/upload-artifact@v7
+              if: always()
+              with:
+                  name: browser-diagnostics
                   path: |
-                      output/type-diagnostics.txt
                       output/browser-metrics.json
+                      output/mode-metrics.json
+                      output/equipment-clarity.png
                   retention-days: 7
+    windows:
+        needs: distribution
+        runs-on: windows-2025
+        timeout-minutes: 40
+        steps:
+            - uses: actions/checkout@v6
+            - uses: ./.github/actions/setup
+            - uses: actions/download-artifact@v8
+              with:
+                  name: verified-distribution
+                  path: output
+            - run: tar -xf output/noname-dist.tar
+            - run: pnpm -F @noname/electron build:win
+            - name: Extract final ZIP and start executable
+              shell: pwsh
+              run: |
+                  $version = (Get-Content apps/core/package.json | ConvertFrom-Json).version
+                  Expand-Archive -LiteralPath "output/noname.windows.$version.zip" -DestinationPath output/zip-smoke
+                  node scripts/verify-assets.js output/zip-smoke/noname/resources/app
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                  node scripts/run-portable-smoke.js output/zip-smoke/noname/noname.exe
+                  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: verified-windows
+                  path: |
+                      output/noname.windows.*.zip
+                      output/noname.windows.*.zip.sha256
+                  compression-level: 0
+                  retention-days: 3
+    android:
+        needs: distribution
+        runs-on: ubuntu-24.04
+        timeout-minutes: 40
+        steps:
+            - uses: actions/checkout@v6
+            - uses: ./.github/actions/setup
+            - uses: actions/download-artifact@v8
+              with:
+                  name: verified-distribution
+                  path: output
+            - run: tar -xf output/noname-dist.tar
+            - uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: "21"
+                  cache: gradle
+            - uses: android-actions/setup-android@v3
+            - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+            - run: chmod +x apps/mobile/native/android/gradlew
+            - run: pnpm -F @noname/mobile build:android --variant=debug --skip-web-build
+    ios:
+        needs: distribution
+        runs-on: macos-26
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v6
+            - uses: ./.github/actions/setup
+            - uses: actions/download-artifact@v8
+              with:
+                  name: verified-distribution
+                  path: output
+            - run: tar -xf output/noname-dist.tar
+            - run: pnpm -F @noname/mobile sync:ios
+            - name: Compile iOS without signing credentials
+              working-directory: apps/mobile/native/ios/App
+              run: >-
+                  xcodebuild -project App.xcodeproj -scheme App -configuration Release
+                  -sdk iphoneos -destination 'generic/platform=iOS'
+                  -derivedDataPath "$RUNNER_TEMP/DerivedData"
+                  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+                  CODE_SIGN_IDENTITY="" ARCHS=arm64 -quiet build

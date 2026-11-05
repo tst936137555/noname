@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
-import { characterPacks, cardPacks, modes, fixedAppearance, simplifyConfig } from "../noname/util/product.js";
+import { characterPacks, cardPacks, modes, fixedAppearance, simplifyConfig, initializeModeConfig } from "../noname/util/product.js";
 import { createSettingsPages, isSettingVisible } from "../noname/ui/create/menu/settings.js";
 import { fitMenu } from "../noname/ui/create/menu/geometry.js";
 
@@ -274,4 +274,17 @@ test("保留内容的源码入口完整，已禁用的包体源码已清理", ()
 	for (const name of ["boss", "brawl", "chess", "realtime", "stone", "tafang"]) {
 		assert.equal(fs.existsSync(new URL(`mode/${name}.js`, root)), false, name);
 	}
+});
+
+test("mode defaults initialize before lazy menus and preserve valid saved choices", () => {
+ const config = defaults(); simplifyConfig(config);
+ const definitions = { single: { config: { single_mode: { init: "normal", item: { normal: "Normal", changban: "Changban" } } } }, guozhan: { config: { player_number: { init: "8" } } } };
+ initializeModeConfig(config, definitions);
+ assert.equal(config.mode_config.single.single_mode, "normal");
+ assert.equal(config.mode_config.guozhan.player_number, "8");
+ config.mode_config.single.single_mode = "changban"; initializeModeConfig(config, definitions);
+ assert.equal(config.mode_config.single.single_mode, "changban");
+ config.mode_config.single.single_mode = "removed"; initializeModeConfig(config, definitions);
+ assert.equal(config.mode_config.single.single_mode, "normal");
+ assert.notEqual(config.mode_config.identity, config.mode_config.guozhan);
 });

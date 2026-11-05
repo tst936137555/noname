@@ -1,0 +1,23 @@
+name: Workspace setup
+description: Install the repository toolchain and workspace lockfiles
+runs:
+    using: composite
+    steps:
+        - uses: actions/setup-node@v6
+          with:
+              node-version: 24
+        - uses: pnpm/action-setup@v5
+          with:
+              run_install: false
+        - id: store
+          shell: bash
+          run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+        - uses: actions/cache@v4
+          with:
+              path: ${{ steps.store.outputs.path }}
+              key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
+              restore-keys: pnpm-${{ runner.os }}-
+        - shell: bash
+          env:
+              ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+          run: pnpm install --frozen-lockfile

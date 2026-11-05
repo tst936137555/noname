@@ -5948,13 +5948,14 @@ const skills = {
 						case 2:
 							await player.draw(2);
 							break;
-						case 3:
+						case 3: {
 							const cards = target.getGainableCards(player, "ej");
 							if (cards.length) {
 								await player.gain({ cards, source: target, animate: "giveAuto", bySelf: true });
 							}
 							await target.damage(3);
 							break;
+						}
 					}
 				},
 				ai: {
@@ -16641,7 +16642,7 @@ const skills = {
 								const card = button.link;
 
 								const targetx = lib.skill.jinhui.getUsableTarget(card, player, target);
-								const effect = get.effect(targetx, card, player, player);
+								let effect = get.effect(targetx, card, player, player);
 								const cards = event.getParent().cards.slice(0);
 								let effect2 = 0;
 								let effect3 = 0;

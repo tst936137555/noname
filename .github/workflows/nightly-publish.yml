@@ -1,64 +1,15 @@
-name: Nightly Publish
-
+name: Nightly
 on:
     schedule:
-        - cron: "11 13 * * *" # 每天的 21:11 运行
-    workflow_dispatch: # 允许手动点击按钮触发编译
-
+        - cron: "11 13 * * *"
+    workflow_dispatch:
 permissions:
-    contents: write # 允许 Actions 推送代码到仓库
-
+    contents: read
+concurrency:
+    group: nightly
+    cancel-in-progress: false
 jobs:
     verify:
         uses: ./.github/workflows/verify.yml
-
-    publish:
-        name: Nightly Publish
-        needs: verify
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v6
-
-            - name: Install pnpm
-              uses: pnpm/action-setup@v5
-              with:
-                  version: 11.25.0
-                  run_install: false
-
-            - name: Install Node.js
-              uses: actions/setup-node@v6
-              with:
-                  node-version: 24
-                  cache: "pnpm"
-
-            - name: Install dependencies
-              run: pnpm install --frozen-lockfile
-
-            - name: Run regression tests
-              run: |
-                  pnpm test
-                  pnpm check:types
-
-            - name: Resolve Nightly Metadata
-              id: info
-              shell: bash
-              run: |
-                  BUILD_TIME="$(TZ=Asia/Shanghai date --iso-8601=seconds)"
-                  BUILD_DATE="${BUILD_TIME%%T*}"
-                  echo "NONAME_BUILD_CHANNEL=nightly" >> "$GITHUB_ENV"
-                  echo "NONAME_BUILD_COMMIT=$GITHUB_SHA" >> "$GITHUB_ENV"
-                  echo "NONAME_BUILD_TIME=$BUILD_TIME" >> "$GITHUB_ENV"
-                  echo "date=${BUILD_DATE//-/}" >> "$GITHUB_OUTPUT"
-
-            - name: Build full package
-              run: pnpm package
-
-            - name: Upload Nightly Artifact
-              uses: actions/upload-artifact@v7
-              with:
-                  name: 全量包-${{ steps.info.outputs.date }}
-                  path: output/noname
-                  include-hidden-files: true
-                  retention-days: 7
+        with:
+            channel: nightly

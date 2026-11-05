@@ -120,25 +120,27 @@ function bindImport(node) {
 			alert("存档超过 32 MiB 限制。");
 			return;
 		}
-		let data;
-		try {
-			data = JSON.parse(lib.init.decode(await file.text()));
-			if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid save");
-			validateSave(data);
-		} catch {
-			alert("导入失败：请选择有效的游戏存档。");
-			return;
-		}
-		const version = typeof data.gameVersion === "string" ? data.gameVersion : "旧版";
-		if (!confirm(`将导入 ${version} 存档，覆盖当前设置与存档并重新启动。录像不受影响。是否继续？`)) return;
 		this.disabled = true;
 		try {
-			await importSave(lib.db, data);
-			alert("导入成功，游戏将重新启动。");
-			// 启动时统一修正旧存档外观，不在重启前应用旧字体／布局。
-			game.reload();
-		} catch {
-			alert("导入失败：无法写入游戏存档。");
+			let data;
+			try {
+				data = JSON.parse(lib.init.decode(await file.text()));
+				if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid save");
+				validateSave(data);
+			} catch {
+				alert("导入失败：请选择有效的游戏存档。");
+				return;
+			}
+			const version = typeof data.gameVersion === "string" ? data.gameVersion : "旧版";
+			if (!confirm(`将导入 ${version} 存档，覆盖当前设置与存档并重新启动。录像不受影响。是否继续？`)) return;
+			try {
+				await importSave(lib.db, data);
+				alert("导入成功，游戏将重新启动。");
+				// 启动时统一修正旧存档外观，不在重启前应用旧字体／布局。
+				game.reload();
+			} catch {
+				alert("导入失败：无法写入游戏存档。");
+			}
 		} finally {
 			this.disabled = false;
 		}

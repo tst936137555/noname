@@ -22,7 +22,7 @@
 		"dev": "pnpm vite dev",
 		"build": "tsx scripts/build.ts",
 		"build:types": "tsc -p tsconfig.types.json",
-		"lint": "pnpm eslint noname/**",
+		"lint": "pnpm eslint noname character card mode",
 		"lint:prettier": "pnpm prettier -c noname/**"
 	},
 	"dependencies": {

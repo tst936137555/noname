@@ -15,7 +15,8 @@
 		"audit:assets": "node scripts/audit-assets.js",
 		"verify:assets": "node scripts/verify-assets.js",
 		"check:platforms": "tsc -p tsconfig.platforms.json --pretty false",
-		"lint:engineering": "eslint scripts apps/core/scripts apps/core/bootstrap.js apps/core/recovery.js apps/electron/build.ts apps/electron/vite.config.ts apps/mobile/scripts packages/*/build.ts"
+		"lint:engineering": "eslint scripts apps/core/scripts apps/core/bootstrap.js apps/core/recovery.js apps/electron/build.ts apps/electron/vite.config.ts apps/mobile/scripts packages/*/build.ts",
+		"test:modes": "node scripts/run-browser-smoke.js --modes"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",

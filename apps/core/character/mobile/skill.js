@@ -12034,7 +12034,7 @@ const skills = {
 					.set("prompt2", `将场上的一张【大攻车】交给另一名角色并令其使用之`)
 					.set("ai", target => {
 						const player = get.player();
-						const att = get.attitude(player, target);
+						let att = get.attitude(player, target);
 						if (!ui.selected.targets.length) {
 							if (att > 0) {
 								return 0;
@@ -30651,9 +30651,7 @@ const skills = {
 			basic: {
 				charlotte: true,
 				audio: "zhanyi",
-				hiddenCard(player, name) {
-					return get.type(name) == "basic" && player.hasCards("hs", { type: "basic" });
-				},
+
 				enable: "chooseToUse",
 				filter(event, player) {
 					if (

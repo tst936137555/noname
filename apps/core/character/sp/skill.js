@@ -2414,7 +2414,7 @@ const skills = {
 							cell.style.visibility = "hidden";
 							break;
 						//特殊事件格
-						case "(":
+						case "(": {
 							const j = item.indexOf(")", i);
 							const [eventName, score, cityName] = item
 								.slice(i + 1, j)
@@ -2457,6 +2457,7 @@ const skills = {
 							}
 							i = j;
 							break;
+						}
 						//玩家出生点
 						case "p":
 							cell.setBackground("ol_peixiu", "character");

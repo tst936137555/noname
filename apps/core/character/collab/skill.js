@@ -74,7 +74,7 @@ const skills = {
 								game.log(trigger.card, "额外结算一次");
 							}
 							break;
-						case 4:
+						case 4: {
 							let map = {},
 								numx = 0;
 							if (_status.connectMode) game.broadcastAll(() => (_status.noclearcountdown = true));
@@ -103,10 +103,12 @@ const skills = {
 								for (const i of targets) await i.damage(map[i.playerid]);
 							}
 							break;
-						case 5:
+						}
+						case 5: {
 							let skills = lib.skill[event.name].skillList.filter(skill => !player.hasSkill(skill, null, false, false));
 							if (skills.length) await player.addTempSkills(skills.randomGet());
 							break;
+						}
 					}
 				},
 				skillList: ["qice", "wusheng", "lihun", "xinanguo", "keji", "spolzhujiu", "juesi", "mashu"],
@@ -159,10 +161,11 @@ const skills = {
 						return;
 					}
 					switch (get.rand(1, 5)) {
-						case 1:
+						case 1: {
 							const cards = player.getDiscardableCards(player, "he").randomGets(get.rand(1, 2));
 							if (cards.length) await player.discard(cards);
 							break;
+						}
 						case 2:
 							await player.loseHp();
 							break;
@@ -183,14 +186,16 @@ const skills = {
 								game.log(trigger.card, "的目标被改为", targets);
 							}
 							break;
-						case 4:
+						case 4: {
 							const card = player.getCards("h", card => player.canRecast(card)).randomGet();
-							if (card.length) await player.recast(card);
+							if (card) await player.recast(card);
 							break;
-						case 5:
+						}
+						case 5: {
 							let skills = lib.skill[event.name].skillList.filter(skill => !player.hasSkill(skill, null, false, false));
 							if (skills.length) await player.addTempSkills(skills.randomGet());
 							break;
+						}
 					}
 				},
 				skillList: ["zili", "zaoxian", "juyi", "hongju", "rekurou", "ranshang", "dushi", "fanxiang"],
@@ -1201,7 +1206,7 @@ const skills = {
 						const discards = Array.from(ui.discardPile.childNodes);
 						return discards.some(cardx => cardx.name == card.name) && lib.filter.cardDiscardable(card, player, "boxue_backup");
 					},
-					selectCard: -1,
+
 					audio: "boxue",
 					popname: true,
 					ignoreMod: true,
@@ -1220,7 +1225,7 @@ const skills = {
 						nature: links[0][3],
 						suit: "none",
 						color: "none",
-						number: null,
+						number: undefined,
 						isCard: true,
 					},
 					async precontent(event, trigger, player) {

@@ -12,7 +12,14 @@ export async function resetUserData({ prefix, db, storage = localStorage, databa
 		request.onblocked = onBlocked;
 	});
 	const keep = new Set([prefix + "legacy_config_import", prefix + "session_accounts"]);
-	if (identity.every(Boolean)) for (const key of ["key", "session_secret"]) keep.add(prefix + key);
+	let accounts;
+	try {
+		accounts = JSON.parse(storage.getItem(prefix + "session_accounts") || "null");
+	} catch {
+		/* Invalid credentials are not retained as an identity. */
+	}
+	const hasAccounts = accounts && typeof accounts === "object" && !Array.isArray(accounts) && Object.values(accounts).some(value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value));
+	if (identity[0] && (identity[1] || hasAccounts)) for (const key of ["key", "session_secret"]) keep.add(prefix + key);
 	for (let i = storage.length - 1; i >= 0; i--) {
 		const key = storage.key(i);
 		if (key?.startsWith(prefix) && !keep.has(key)) storage.removeItem(key);

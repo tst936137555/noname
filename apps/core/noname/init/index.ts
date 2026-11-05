@@ -3,7 +3,7 @@ import { confirmReset } from "@/util/reset.js";
 /// <reference types="vite/client" />
 import gamePackage from "../../package.json";
 import { rootURL, lib, game, get, _status, ui, ai } from "noname";
-import { characterPacks, cardPacks, modes, simplifyConfig } from "@/util/product.js";
+import { characterPacks, cardPacks, modes, simplifyConfig, initializeModeConfig } from "@/util/product.js";
 import { userAgentLowerCase } from "@/util/index.js";
 import * as config from "@/util/config.js";
 import { setOnError } from "@/util/error.ts";
@@ -50,6 +50,7 @@ export async function boot() {
 	await loadConfig();
 	const migrateSelectionDefaults = Reflect.get(lib.config, "selection_defaults_version") !== 1;
 	simplifyConfig(lib.config);
+	initializeModeConfig(lib.config, lib.mode);
 	if (migrateSelectionDefaults) {
 		for (const mode of ["global", ...modes]) await game.saveConfig("free_choose", false, mode);
 		await game.saveConfig("selection_defaults_version", 1);

@@ -395,7 +395,9 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 			// forward from slave to owner
 			if (client.owner) {
-				util.sendl(client.owner, "onmessage", client.wsid, raw);
+				const forwarded = JSON.stringify(["onmessage", client.wsid, raw]);
+				if (Buffer.byteLength(forwarded) > MAX_MESSAGE_BYTES) return client.close(1009, "Forwarded message too large");
+				boundedSend(client.owner, forwarded);
 				return;
 			}
 

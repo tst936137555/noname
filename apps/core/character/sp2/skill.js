@@ -552,7 +552,6 @@ const skills = {
 							} else {
 								return typeof link == "number";
 							}
-							return false;
 						})
 						.set(
 							"list",
