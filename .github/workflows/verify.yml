@@ -38,6 +38,8 @@ jobs:
         steps:
             - uses: actions/checkout@v6
             - uses: ./.github/actions/setup
+              with:
+                  electron-runtime: "true"
             - run: pnpm build
               env:
                   NONAME_BUILD_CHANNEL: ${{ inputs.channel || 'test' }}
@@ -77,6 +79,8 @@ jobs:
         steps:
             - uses: actions/checkout@v6
             - uses: ./.github/actions/setup
+              with:
+                  electron-runtime: "true"
             - uses: actions/download-artifact@v8
               with:
                   name: verified-distribution

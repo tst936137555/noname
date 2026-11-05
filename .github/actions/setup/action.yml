@@ -1,5 +1,9 @@
 name: Workspace setup
 description: Install the repository toolchain and workspace lockfiles
+inputs:
+    electron-runtime:
+        description: Download and verify the Electron runtime for desktop checks
+        default: "false"
 runs:
     using: composite
     steps:
@@ -21,3 +25,11 @@ runs:
           env:
               ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
           run: pnpm install --frozen-lockfile
+        - name: Install and verify Electron runtime
+          if: inputs.electron-runtime == 'true'
+          shell: bash
+          env:
+              ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+          run: |
+              node apps/electron/node_modules/electron/install.js
+              node -e "const fs = require('node:fs'); const binary = require('./apps/electron/node_modules/electron'); fs.accessSync(binary, fs.constants.X_OK); console.log('Electron runtime ready:', binary)"
