@@ -8,8 +8,9 @@ import { packageWindows, restoreWindowsGame } from "./lib/windows-package.js";
 import { resourceManifest, verifyManifest } from "./lib/assets.js";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
+import { extractDistribution } from "./lib/archive.js";
 
-test("发行归档解压后保留重音和中文文件名", async t => {
+test("发行归档解压后保留重音、组合字符和中文文件名", async t => {
 	const root = await mkdtemp(join(tmpdir(), "noname-archive-"));
 	t.after(() => rm(root, { recursive: true, force: true }));
 	const source = join(root, "dist");
@@ -17,7 +18,7 @@ test("发行归档解压后保留重音和中文文件名", async t => {
 	await mkdir(join(source, "game"), { recursive: true });
 	await mkdir(join(source, "audio/die"), { recursive: true });
 	await mkdir(restored);
-	for (const name of ["dc_zhangyì.mp3", "语音.mp3"]) {
+	for (const name of ["dc_zhangyì.mp3", "语音.mp3", "combining-e\u0301.mp3"]) {
 		await writeFile(join(source, "audio/die", name), name);
 	}
 	const manifest = await resourceManifest(source);
@@ -28,7 +29,7 @@ test("发行归档解压后保留重音和中文文件名", async t => {
 	} else {
 		execFileSync("tar", ["--format=pax", "-cf", archive, "dist"], { cwd: root, windowsHide: true });
 	}
-	execFileSync("tar", ["-xf", archive, "-C", restored], { windowsHide: true });
+	extractDistribution(archive, restored);
 	await verifyManifest(join(restored, "dist"), manifest);
 });
 

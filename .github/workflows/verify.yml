@@ -88,7 +88,7 @@ jobs:
               with:
                   name: verified-distribution
                   path: output
-            - run: tar -xf output/noname-dist.tar
+            - run: node scripts/extract-distribution.js
             - run: pnpm verify:assets
             - run: pnpm -F @noname/electron build:win
             - name: Extract final ZIP and start executable
@@ -119,7 +119,7 @@ jobs:
               with:
                   name: verified-distribution
                   path: output
-            - run: tar -xf output/noname-dist.tar
+            - run: node scripts/extract-distribution.js
             - run: pnpm verify:assets
             - uses: actions/setup-java@v5
               with:
@@ -143,7 +143,7 @@ jobs:
               with:
                   name: verified-distribution
                   path: output
-            - run: tar -xf output/noname-dist.tar
+            - run: node scripts/extract-distribution.js
             - run: pnpm verify:assets
             - run: pnpm -F @noname/mobile sync:ios
             - name: Compile iOS without signing credentials

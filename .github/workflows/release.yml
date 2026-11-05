@@ -90,7 +90,7 @@ jobs:
               with:
                   name: verified-distribution
                   path: output
-            - run: tar -xf output/noname-dist.tar
+            - run: node scripts/extract-distribution.js
 
             - name: Run regression tests
               run: |
@@ -176,7 +176,7 @@ jobs:
               with:
                   name: verified-distribution
                   path: output
-            - run: tar -xf output/noname-dist.tar
+            - run: node scripts/extract-distribution.js
 
             - name: Install JDK 21
               uses: actions/setup-java@v5
@@ -253,7 +253,7 @@ jobs:
               with:
                   name: verified-distribution
                   path: output
-            - run: tar -xf output/noname-dist.tar
+            - run: node scripts/extract-distribution.js
 
             - name: Build noname
               run: pnpm verify:assets
