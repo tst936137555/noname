@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { stat, rename, rm, writeFile, readFile, copyFile, mkdir } from "node:fs/promises";
+import { stat, rename, rm, writeFile, readFile, copyFile, mkdir, chmod } from "node:fs/promises";
 import { join, resolve, basename, dirname, sep } from "node:path";
 import { copyTree, publishDirectory } from "./distribution.js";
 import { verifyManifest } from "./assets.js";
@@ -31,6 +31,11 @@ export async function restoreWindowsGame(distribution, appRoot) {
 /** Portable Windows releases always contain one top-level noname directory. */
 export async function packageWindows(source, output, version, archiver) {
 	if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid game version");
+	// Package-manager installs and cache restores can strip the bundled 7za execute bit.
+	const archiverInfo = await stat(archiver);
+	if (process.platform !== "win32" && !(archiverInfo.mode & 0o100)) {
+		await chmod(archiver, archiverInfo.mode | 0o100);
+	}
 	output = resolve(output);
 	await stat(join(source, "noname.exe"));
 	await stat(join(source, "resources/app/noname.js"));

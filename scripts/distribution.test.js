@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, copyFile, chmod, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { packageDistribution, publishDirectory } from "./lib/distribution.js";
 import { packageWindows, restoreWindowsGame } from "./lib/windows-package.js";
 import { resourceManifest, verifyManifest } from "./lib/assets.js";
@@ -38,8 +38,12 @@ test("Windows ZIP 解压后只有 noname 顶层目录并包含启动程序和游
 	const builder = createRequire(app.resolve("electron-builder"));
 	const packager = createRequire(builder.resolve("app-builder-lib"));
 	const { path7za } = packager("7zip-bin");
-	const archive = await packageWindows(source, join(root, "output"), "1.2.3", path7za);
-	const list = execFileSync(path7za, ["l", "-slt", archive], { encoding: "utf8", windowsHide: true }).replaceAll("\\", "/");
+	const archiver = join(root, basename(path7za));
+	await copyFile(path7za, archiver);
+	await chmod(archiver, 0o644);
+	const archive = await packageWindows(source, join(root, "output"), "1.2.3", archiver);
+	if (process.platform !== "win32") assert.ok((await stat(archiver)).mode & 0o100, "Packaging restores the owner execute bit");
+	const list = execFileSync(archiver, ["l", "-slt", archive], { encoding: "utf8", windowsHide: true }).replaceAll("\\", "/");
 	assert.ok(list.includes("Path = noname/noname.exe"));
 	assert.ok(list.includes("Path = noname/resources/app/noname.js"));
 	assert.ok((await readFile(archive + ".sha256", "utf8")).includes("noname.windows.1.2.3.zip"));
