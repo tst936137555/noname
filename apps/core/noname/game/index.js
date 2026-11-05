@@ -1,3 +1,5 @@
+import { bindLobbyCredential } from "../util/session.js";
+import { resizeCanvas } from "../util/render.js";
 import { socketAddress } from "../util/network.js";
 /**
  * @typedef {{
@@ -2143,6 +2145,9 @@ export class Game {
 				delete game.ws;
 			}
 			game.ws = new WebSocket(url);
+			let legacyAddress;
+			try { legacyAddress = socketAddress(lib.config.reconnect_info?.[0] || "", get.config("wss_mode", "connect")); } catch { /* No prior lobby. */ }
+			bindLobbyCredential(localStorage, lib.configprefix, Reflect.get(game, "ws"), url, legacyAddress);
 		} catch (error) {
 			delete _status.connectCallback;
 			alert("连接失败：" + (error instanceof Error ? error.message : "无效联机地址"));
@@ -5306,8 +5311,7 @@ export class Game {
 					div1.style.opacity = "0.7";
 					div.appendChild(div1);
 					var canvas = document.createElement("canvas");
-					canvas.width = div1.offsetWidth;
-					canvas.height = div1.offsetHeight;
+					resizeCanvas(canvas, div1.offsetWidth, div1.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 					div1.appendChild(canvas);
 					var context = canvas.getContext("2d");
 					var start;
@@ -7220,8 +7224,7 @@ export class Game {
 			ui.touchlines.forEach(i => i.delete());
 			ui.touchlines.length = 0;
 		}
-		ui.canvas.width = ui.arena.offsetWidth;
-		ui.canvas.height = ui.arena.offsetHeight;
+		resizeCanvas(ui.canvas, ui.arena.offsetWidth, ui.arena.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 		players.forEach(i => i.unprompt());
 		_status.dragline.forEach(i => i && i.remove());
 		_status.dragline.length = 0;
@@ -7261,6 +7264,8 @@ export class Game {
 			let seat2 = player2.seatNum;
 			player2.seatNum = seat1;
 			player1.seatNum = seat2;
+			player1.updateSeatNumber();
+			player2.updateSeatNumber();
 			let temp1, pos, i, num;
 			temp1 = player1.dataset.position;
 			player1.dataset.position = player2.dataset.position;
@@ -9118,26 +9123,26 @@ export class Game {
 			transaction.onerror = transaction.onabort = event => {
 				if (settled) return;
 				settled = true;
-				if (typeof onError == "function") {
-					onError(event);
-					game.reload2();
-					resolve();
-				} else {
-					game.reload2();
-					reject(event);
-				}
+				try {
+					if (typeof onError == "function") { onError(event); resolve(undefined); } else reject(event);
+				} catch (error) { reject(error); } finally { game.reload2(); }
 			};
 			transaction.oncomplete = () => {
 				if (settled) return;
 				settled = true;
 				const event = resultEvent;
-				if (typeof onSuccess == "function") {
-					_status.dburgent = true;
-					onSuccess(event);
+				try {
+					if (typeof onSuccess == "function") {
+						_status.dburgent = true;
+						onSuccess(event);
+					}
+					resolve(event);
+				} catch (error) {
+					reject(error);
+				} finally {
 					delete _status.dburgent;
+					game.reload2();
 				}
-				game.reload2();
-				resolve(event);
 			};
 		});
 	}
@@ -9188,24 +9193,16 @@ export class Game {
 						lib.status.reload++;
 						const idbRequest = lib.db.transaction([storeName], "readwrite").objectStore(storeName).get(query);
 						idbRequest.onerror = event => {
-							if (typeof onError == "function") {
-								onError(event);
-								game.reload2();
-								resolve();
-							} else {
-								game.reload2();
-								reject(event);
-							}
+							try {
+								if (typeof onError == "function") { onError(event); resolve(undefined); } else reject(event);
+							} catch (error) { reject(error); } finally { game.reload2(); }
 						};
 						idbRequest.onsuccess = event => {
 							const result = event.target.result;
-							if (typeof onSuccess == "function") {
-								_status.dburgent = true;
-								onSuccess(result);
-								delete _status.dburgent;
-							}
-							game.reload2();
-							resolve(result);
+							try {
+								if (typeof onSuccess == "function") { _status.dburgent = true; onSuccess(result); }
+								resolve(result);
+							} catch (error) { reject(error); } finally { delete _status.dburgent; game.reload2(); }
 						};
 					}
 				: (resolve, reject) => {
@@ -9213,14 +9210,9 @@ export class Game {
 						const idbRequest = lib.db.transaction([storeName], "readwrite").objectStore(storeName).openCursor(),
 							object = {};
 						idbRequest.onerror = event => {
-							if (typeof onError == "function") {
-								onError(event);
-								game.reload2();
-								resolve();
-							} else {
-								game.reload2();
-								reject(event);
-							}
+							try {
+								if (typeof onError == "function") { onError(event); resolve(undefined); } else reject(event);
+							} catch (error) { reject(error); } finally { game.reload2(); }
 						};
 						idbRequest.onsuccess = event => {
 							const result = event.target.result;
@@ -9229,13 +9221,10 @@ export class Game {
 								result.continue();
 								return;
 							}
-							if (typeof onSuccess == "function") {
-								_status.dburgent = true;
-								onSuccess(object);
-								delete _status.dburgent;
-							}
-							game.reload2();
-							resolve(object);
+							try {
+								if (typeof onSuccess == "function") { _status.dburgent = true; onSuccess(object); }
+								resolve(object);
+							} catch (error) { reject(error); } finally { delete _status.dburgent; game.reload2(); }
 						};
 					}
 		);
@@ -9285,21 +9274,13 @@ export class Game {
 					lib.status.reload++;
 					const record = lib.db.transaction([storeName], "readwrite").objectStore(storeName).delete(query);
 					record.onerror = event => {
-						if (typeof onError == "function") {
-							onError(event);
-							game.reload2();
-							resolve();
-						} else {
-							game.reload2();
-							reject(event);
-						}
+						try {
+							if (typeof onError == "function") { onError(event); resolve(undefined); } else reject(event);
+						} catch (error) { reject(error); } finally { game.reload2(); }
 					};
 					record.onsuccess = event => {
-						if (typeof onSuccess == "function") {
-							onSuccess(event);
-						}
-						game.reload2();
-						resolve(event);
+						try { if (typeof onSuccess == "function") onSuccess(event); resolve(event); }
+						catch (error) { reject(error); } finally { game.reload2(); }
 					};
 				})
 			: game.getDB(storeName).then(object => {
@@ -9423,7 +9404,7 @@ export class Game {
 			base[key] = value;
 		}
 
-		save(storeKey, "config", value).then(callback);
+		return save(storeKey, "config", value).then(callback);
 	}
 	/**
 	 * @param { string } key

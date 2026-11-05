@@ -15,7 +15,7 @@
 ## 环境与启动
 
 - Node.js：建议使用与 CI 一致的 24 版本。
-- pnpm：10 或 11；CI 使用 10。
+- pnpm：11.25.0；本地与 CI 使用同一固定版本。
 - 浏览器构建目标：Chromium 91 或更高、Safari 16.4 或更高；目前不支持 Firefox。请通过 HTTP 服务启动。
 
 在仓库根目录执行：
@@ -95,6 +95,8 @@ pnpm -F @noname/electron build:win
 pnpm -F @noname/electron build:mac
 pnpm -F @noname/electron build:linux
 ```
+
+Windows 输出 `output/noname.windows.版本号.zip`，解压后为 `noname/`，直接运行其中的 `noname.exe`。
 
 移动端构建和原生工具链要求见 [apps/mobile/README.md](apps/mobile/README.md)。
 

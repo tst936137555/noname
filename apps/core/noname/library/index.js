@@ -1,3 +1,5 @@
+import { socketCredential } from "../util/session.js";
+import { resizeCanvas } from "../util/render.js";
 /**
  * @typedef { InstanceType<typeof lib.element.Player> } Player
  * @typedef { InstanceType<typeof lib.element.Card> } Card
@@ -5920,7 +5922,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
 						if (get.mode() != this._link.config.mode || (!_status.event.getParent().showConfig && !_status.event.showConfig)) {
@@ -6518,7 +6520,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
 						if (get.mode() != this._link.config.mode || (!_status.event.getParent().showConfig && !_status.event.showConfig)) {
@@ -6885,7 +6887,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					frequent: true,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
@@ -7258,7 +7260,7 @@ export class Library {
 			config: {
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					frequent: true,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
@@ -7550,7 +7552,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
 						if (get.mode() != this._link.config.mode || (!_status.event.getParent().showConfig && !_status.event.showConfig)) {
@@ -7877,7 +7879,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
 						if (get.mode() != this._link.config.mode || (!_status.event.getParent().showConfig && !_status.event.showConfig)) {
@@ -8062,7 +8064,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
 						if (get.mode() != this._link.config.mode || (!_status.event.getParent().showConfig && !_status.event.showConfig)) {
@@ -8339,7 +8341,7 @@ export class Library {
 				},
 				free_choose: {
 					name: "自由选将",
-					init: true,
+					init: false,
 					onclick(bool) {
 						game.saveConfig("free_choose", bool, this._link.config.mode);
 						if (_status.connectMode) {
@@ -8658,8 +8660,7 @@ export class Library {
 			lib.status.canvas = false;
 			return false;
 		}
-		ui.canvas.width = ui.arena.offsetWidth;
-		ui.canvas.height = ui.arena.offsetHeight;
+		resizeCanvas(ui.canvas, ui.arena.offsetWidth, ui.arena.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 		var ctx = ui.ctx;
 		ctx.shadowBlur = 5;
 		ctx.shadowColor = "rgba(0,0,0,0.3)";
@@ -10046,7 +10047,7 @@ export class Library {
 					return;
 				}
 				try {
-					lib.message.client[message.shift()].apply(null, message);
+					lib.message.client[message.shift()].apply(this, message);
 				} catch (error) {
 					console.error(error);
 					this.close();
@@ -12142,12 +12143,7 @@ export class Library {
 				ui.create.connecting(true);
 			},
 			roomlist: function (list, events, clients, wsid) {
-				let secret = localStorage.getItem(lib.configprefix + "session_secret");
-				if (!secret) {
-					const bytes = crypto.getRandomValues(new Uint8Array(32));
-					secret = Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
-					localStorage.setItem(lib.configprefix + "session_secret", secret);
-				}
+				const secret = socketCredential(this);
 				game.send("server", "key", [game.onlineKey, lib.version, secret]);
 				game.online = true;
 				game.onlinehall = true;
@@ -12670,6 +12666,7 @@ export class Library {
 						player.side = info.side;
 						player.phaseNumber = info.phaseNumber;
 						player.seatNum = info.seatNum;
+						player.updateSeatNumber();
 						player.disabledSlots = info.disabledSlots;
 						player.expandedSlots = info.expandedSlots;
 						player.extraEquip = info.extraEquip;

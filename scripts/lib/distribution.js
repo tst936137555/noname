@@ -1,5 +1,35 @@
-import { cp, mkdir, rm, stat, mkdtemp, rename } from "node:fs/promises";
+import { copyFile, readdir, lstat, mkdir, rm, stat, mkdtemp, rename } from "node:fs/promises";
 import { resolve, relative, isAbsolute, dirname, join } from "node:path";
+
+/** Bound parallel file copies without serializing thousands of independent assets. */
+export async function copyTree(source, destination) {
+	const info = await lstat(source);
+	if (info.isFile()) {
+		await mkdir(dirname(destination), { recursive: true });
+		return copyFile(source, destination);
+	}
+	if (!info.isDirectory()) throw new Error(`Unsupported distribution entry: ${source}`);
+	const jobs = [];
+	async function walk(from, to) {
+		await mkdir(to, { recursive: true });
+		for (const entry of await readdir(from, { withFileTypes: true })) {
+			const input = join(from, entry.name), output = join(to, entry.name);
+			if (entry.isDirectory()) await walk(input, output);
+			else if (entry.isFile()) jobs.push([input, output]);
+			else throw new Error(`Unsupported distribution entry: ${input}`);
+		}
+	}
+	await walk(source, destination);
+	let next = 0;
+	const results = await Promise.allSettled(Array.from({ length: Math.min(8, jobs.length) }, async () => {
+		while (next < jobs.length) {
+			const [from, to] = jobs[next++];
+			await copyFile(from, to);
+		}
+	}));
+	const failure = results.find(result => result.status === "rejected");
+	if (failure) throw failure.reason;
+}
 
 /** Copy the complete build, including all bundled resources, into a clean package. */
 export async function packageDistribution(source, destination) {
@@ -15,7 +45,7 @@ export async function packageDistribution(source, destination) {
 	for (const entry of ["noname.js", "image", "audio", "font"]) {
 		await stat(resolve(source, entry));
 	}
-	await publishDirectory(destination, staging => cp(source, staging, { recursive: true }));
+	await publishDirectory(destination, staging => copyTree(source, staging));
 }
 
 /** Populate a sibling staging directory before replacing the previous complete output. */

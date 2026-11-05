@@ -1,8 +1,13 @@
+import { resizeCanvas } from "../util/render.js";
 import { lib, game, get, _status } from "noname";
 import { Click } from "./click/index.js";
 import { Create } from "./create/index.js";
 
 export class UI {
+	/** @type {HTMLCanvasElement} */
+	canvas;
+	/** @type {CanvasRenderingContext2D} */
+	ctx;
 	updates = [];
 	thrown = [];
 	touchlines = [];
@@ -608,11 +613,13 @@ export class UI {
 		if (zoom != 1) {
 			document.body.style.width = Math.round(width / zoom) + "px";
 			document.body.style.height = Math.round(height / zoom) + "px";
-			document.body.style.transform = "scale(" + Math.floor(zoom * 100) / 100 + ")";
+			document.body.style.transform = "";
+			document.body.style.zoom = String(zoom);
 		} else {
 			document.body.style.width = width + "px";
 			document.body.style.height = height + "px";
 			document.body.style.transform = "";
+			document.body.style.zoom = "";
 		}
 	}
 	update() {

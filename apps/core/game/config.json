@@ -247,7 +247,7 @@
 			"auto_identity": "off",
 			"double_character": false,
 			"save_progress": true,
-			"free_choose": true,
+			"free_choose": false,
 			"swap": true,
 			"change_identity": true,
 			"battle_number": 3,

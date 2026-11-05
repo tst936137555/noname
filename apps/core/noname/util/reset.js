@@ -11,7 +11,7 @@ export async function resetUserData({ prefix, db, storage = localStorage, databa
 		// and allow the same request to silently delete data later.
 		request.onblocked = onBlocked;
 	});
-	const keep = new Set([prefix + "legacy_config_import"]);
+	const keep = new Set([prefix + "legacy_config_import", prefix + "session_accounts"]);
 	if (identity.every(Boolean)) for (const key of ["key", "session_secret"]) keep.add(prefix + key);
 	for (let i = storage.length - 1; i >= 0; i--) {
 		const key = storage.key(i);
@@ -34,7 +34,7 @@ export function clearReconnectData(db) {
 /** @param {{prefix: string, db?: IDBDatabase, storage?: Storage}} options */
 export async function resetNetworkIdentity({ prefix, db, storage = localStorage }) {
 	await clearReconnectData(db);
-	for (const key of ["key", "session_secret", "directstart"]) storage.removeItem(prefix + key);
+	for (const key of ["key", "session_secret", "session_accounts", "directstart"]) storage.removeItem(prefix + key);
 }
 
 /** All user-facing reset entry points share the same completion and failure handling. */

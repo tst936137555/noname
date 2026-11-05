@@ -1,3 +1,4 @@
+import { resizeCanvas } from "../../util/render.js";
 import { lib, game, get, _status, ui } from "noname";
 export class Click {
 	/**
@@ -1540,8 +1541,7 @@ export class Click {
 			}
 			while (item) {
 				if (lib.config.enable_touchdragline && _status.mouseleft && !game.chess) {
-					ui.canvas.width = ui.arena.offsetWidth;
-					ui.canvas.height = ui.arena.offsetHeight;
+					resizeCanvas(ui.canvas, ui.arena.offsetWidth, ui.arena.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 					var ctx = ui.ctx;
 					ctx.shadowBlur = 5;
 					ctx.shadowColor = "rgba(0,0,0,0.3)";
@@ -1805,8 +1805,7 @@ export class Click {
 				if (!event.filterOk || event.filterOk()) {
 					ui.click.ok();
 				}
-				ui.canvas.width = ui.arena.offsetWidth;
-				ui.canvas.height = ui.arena.offsetHeight;
+				resizeCanvas(ui.canvas, ui.arena.offsetWidth, ui.arena.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 			} else {
 				game.uncheck();
 				game.check();
@@ -1922,8 +1921,7 @@ export class Click {
 				// 	if(remained[j]) remained[j].remove();
 				// }
 
-				ui.canvas.width = ui.arena.offsetWidth;
-				ui.canvas.height = ui.arena.offsetHeight;
+				resizeCanvas(ui.canvas, ui.arena.offsetWidth, ui.arena.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 				var ctx = ui.ctx;
 				ctx.shadowBlur = 5;
 				ctx.shadowColor = "rgba(0,0,0,0.3)";
@@ -2323,8 +2321,7 @@ export class Click {
 			_status.mousedragorigin = null;
 			_status.dragstatuschanged = false;
 			if (ui.arena) {
-				ui.canvas.width = ui.arena.offsetWidth;
-				ui.canvas.height = ui.arena.offsetHeight;
+				resizeCanvas(ui.canvas, ui.arena.offsetWidth, ui.arena.offsetHeight, (window.devicePixelRatio || 1) * (game.documentZoom || 1));
 			}
 			if (tmpflag) {
 				ui.click[get.itemtype(tmpflag)].call(tmpflag);

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { normalizePath, Plugin } from "vite";
 import fs from "fs";
 import path from "path";
@@ -69,8 +70,10 @@ export default function vitePluginJIT(importMap: Record<string, string> = {}): P
 
 		transformIndexHtml(html) {
 			if (!isBuild) return;
+			const content = JSON.stringify({ imports: resolvedImportMap }, null, 2);
+			const hash = createHash("sha256").update(content).digest("base64");
 			return {
-				html,
+				html: html.replace("script-src 'self'", `script-src 'sha256-${hash}' 'self'`),
 				tags: [
 					{
 						tag: "script",

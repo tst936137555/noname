@@ -57,6 +57,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 	let wss: WebSocketServer | undefined;
 	let broadcastTimer: NodeJS.Timeout | undefined;
+	let eventTimer: NodeJS.Timeout | undefined;
 	let roomsDirty = false;
 	const broadcast = () => {
 		broadcastTimer = undefined;
@@ -162,10 +163,12 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 		},
 
 		updateEvents() {
-			util.checkEvents();
-			clients.forEach(c => {
-				if (!c.room) util.sendl(c, "updateevents", events);
-			});
+			if (eventTimer) return;
+			eventTimer = setTimeout(() => {
+				eventTimer = undefined;
+				util.checkEvents();
+				clients.forEach(c => { if (!c.room && c.onlineKey) util.sendl(c, "updateevents", events); });
+			}, 100);
 		},
 	};
 
@@ -213,14 +216,16 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			util.updateClients();
 		},
 
-		key(client: Client, id: any) {
+		async key(client: Client, id: any) {
+			if (client.onlineKey) return;
 			if (!Array.isArray(id) || typeof id[0] !== "string" || !id[0] || id[0].length > 128 || (client.onlineKey && client.onlineKey !== id[0]) || [...clients.values()].some(other => other !== client && other.onlineKey === id[0])) {
 				util.sendl(client, "denied", "key");
 				return client.terminate();
 			}
 			if (typeof id[2] !== "string" || id[2].length < 32 || id[2].length > 256) return client.close(1008, "Session credential required");
 			const credential = createHash("sha256").update(id[2]).digest("hex");
-			const existing = credentials.get(id[0]);
+			const existing = await credentials.get(id[0]);
+			if (client.readyState !== WebSocket.OPEN || [...clients.values()].some(other => other !== client && other.onlineKey === id[0])) return client.close(1008, "Identity already connected");
 			if (existing && existing !== credential) return client.close(1008, "Invalid credential");
 			if (!existing) {
 				const now = Date.now();
@@ -229,10 +234,10 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 				if (window.count >= 60 || (!registrationWindows.has(client.clientIp) && registrationWindows.size >= 1000)) return client.close(1013, "Registration rate limit");
 				window.count++;
 				registrationWindows.set(client.clientIp, window);
-				credentials.register(id[0], credential);
+				await credentials.register(id[0], credential);
 			}
 			if (bannedKeys.has(id[0])) {
-				bannedIps.add(client.clientIp);
+				// Reject this identity without penalizing other users behind the same NAT.
 				return client.terminate();
 			}
 			client.onlineKey = id[0];
@@ -241,7 +246,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 		events(client: Client, cfg: any, id: string, type: string) {
 			if (bannedKeys.has(id) || typeof id !== "string" || client.onlineKey !== id) {
-				bannedIps.add(client.clientIp);
+				// Reject this identity without penalizing other users behind the same NAT.
 				client.close();
 				return;
 			}
@@ -254,7 +259,8 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 				for (let ev of events) {
 					if (ev.id === cfg) {
 						if (type === "join" && !ev.members.includes(id)) {
-							ev.members.push(id);
+							if (ev.members.length >= 1000) return;
+						ev.members.push(id);
 							changed = true;
 						}
 						if (type === "leave") {
@@ -273,7 +279,7 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			} else if (cfg && typeof cfg === "object" && "utc" in cfg && "day" in cfg && "hour" in cfg && "content" in cfg) {
 				if (typeof cfg.content !== "string" || cfg.content.length > 2000 || !Number.isFinite(cfg.utc) || !Number.isInteger(cfg.day) || !Number.isInteger(cfg.hour)) return;
 				if (events.length >= 20) util.sendl(client, "eventsdenied", "total");
-				else if (cfg.utc <= now) util.sendl(client, "eventsdenied", "time");
+				else if (cfg.utc <= now || cfg.utc > now + 30 * 86400000) util.sendl(client, "eventsdenied", "time");
 				else if (util.isBanned(cfg.content)) util.sendl(client, "eventsdenied", "ban");
 				else {
 					const item: EventItem = {
@@ -375,6 +381,9 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 
 		// message handler
 		const budget = messageBudget();
+		let dispatch = Promise.resolve();
+		let pending = 0;
+		let pendingBytes = 0;
 		client.on("message", msg => {
 			if (client.readyState !== WebSocket.OPEN) return;
 			const raw = msg.toString();
@@ -402,12 +411,15 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 			if (arr.shift() !== "server") return;
 
 			const type = arr.shift();
-			if (typeof type !== "string" || !Object.hasOwn(handlers, type) || (type !== "key" && !client.onlineKey)) return;
-			try {
-				handlers[type](client, ...arr);
-			} catch {
-				client.close(1008, "Invalid message");
-			}
+			if (typeof type !== "string" || !Object.hasOwn(handlers, type)) return;
+			const size = Buffer.byteLength(raw);
+			if (pending >= 64 || pendingBytes + size > 4 * 1024 * 1024) return client.close(1008, "Dispatch backlog");
+			pending++;
+			pendingBytes += size;
+			dispatch = dispatch.then(async () => {
+				if (client.readyState !== WebSocket.OPEN || (type !== "key" && !client.onlineKey)) return;
+				await handlers[type](client, ...arr);
+			}).catch(() => { client.close(1008, "Invalid message"); }).finally(() => { pending--; pendingBytes -= size; });
 		});
 
 		// disconnect handler
@@ -465,6 +477,8 @@ export function createServer(options: ServerOptions = {}): ServerInstance {
 		},
 
 		stop() {
+			clearTimeout(eventTimer);
+			eventTimer = undefined;
 			clearTimeout(broadcastTimer);
 			broadcastTimer = undefined;
 			if (!wss) return Promise.resolve();

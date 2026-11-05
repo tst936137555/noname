@@ -3,6 +3,8 @@ import PauseManager from "@/game/PauseManager.ts";
 import { GameEventManager } from "@/library/element/gameEvent.js";
 
 export class status {
+	/** @type {boolean | undefined} */
+	dburgent;
 	/** @type {((connected: boolean) => void) | undefined} */
 	connectCallback;
 	/** @type {(() => void) | undefined} */

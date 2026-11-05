@@ -25,6 +25,8 @@
 	<!-- Documents 用于导出存档和录像，游戏资源随安装包提供。 -->
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>用于连接同一局域网中的无名杀房间。</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- 允许通过 Finder / iTunes 访问 Documents（配合上面的

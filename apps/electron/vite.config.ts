@@ -13,6 +13,7 @@ export default defineConfig({
 					build: {
 						outDir: "dist/app/",
 						minify: false,
+						rollupOptions: { output: { banner: 'import { createRequire as createNodeRequire } from "node:module";const require = createNodeRequire(import.meta.url);' } },
 						// rollupOptions: {
 						// 	output: {
 						// 		preserveModules: true,

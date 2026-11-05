@@ -85,7 +85,7 @@ export default defineConfig(
 		rules: { "no-undef": "error", "@typescript-eslint/no-explicit-any": "error", "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }] },
 	},
 	{
-		files: ["apps/core/bootstrap.js", "apps/core/noname/util/{reset,save,diagnostics,network}.js", "apps/core/noname/ui/accessibility.js"],
+		files: ["apps/core/bootstrap.js", "apps/core/recovery.js", "apps/core/noname/util/{reset,save,diagnostics,network,render,session}.js", "apps/core/noname/ui/accessibility.js"],
 		languageOptions: { globals: { ...Object.fromEntries(Object.keys(globals.node).map(key => [key, "off"])), ...globals.browser } },
 		rules: { "no-undef": "error", "@typescript-eslint/no-explicit-any": "error", "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }] },
 	}

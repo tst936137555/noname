@@ -48,7 +48,12 @@ export async function boot() {
 	setOnError({ lib, game, get, _status });
 
 	await loadConfig();
+	const migrateSelectionDefaults = Reflect.get(lib.config, "selection_defaults_version") !== 1;
 	simplifyConfig(lib.config);
+	if (migrateSelectionDefaults) {
+		for (const mode of ["global", ...modes]) await game.saveConfig("free_choose", false, mode);
+		await game.saveConfig("selection_defaults_version", 1);
+	}
 
 	// 兼容原有鏖战布尔设置，保持原规则并正确显示新的选择菜单。
 	for (const mode of ["guozhan", "connect"]) {
@@ -197,6 +202,7 @@ export async function boot() {
 		const appearenceConfig = lib.configMenu.appearence.config,
 			fontSheet = ui.css.fontsheet.sheet,
 			suitsFont = config.get("suits_font");
+		if (!fontSheet) throw new Error("无法创建字体样式表");
 		Object.keys(pack.font).forEach(value => {
 			const font = pack.font[value];
 			appearenceConfig.name_font.item[value] = font;
@@ -208,6 +214,9 @@ export async function boot() {
 				fontSheet.insertRule(`@font-face {font-family: '${value}'; src: local('${font}'), url('${lib.assetURL}font/suits.woff2');}`, 0);
 			}
 		});
+		for (const value of ["xinwei", "huangcao"]) {
+			fontSheet.insertRule(`@font-face {font-family: '${value}'; src: url('${lib.assetURL}font/${value}-ui.woff2'); font-display: swap; unicode-range: U+20,U+25,U+2B,U+2D,U+2F,U+30,U+31,U+32,U+33,U+34,U+35,U+36,U+37,U+38,U+39,U+41,U+42,U+43,U+44,U+45,U+46,U+47,U+48,U+49,U+4A,U+4B,U+4C,U+4D,U+4E,U+4F,U+50,U+51,U+52,U+53,U+54,U+55,U+56,U+57,U+58,U+59,U+5A,U+61,U+62,U+63,U+64,U+65,U+66,U+67,U+68,U+69,U+6A,U+6B,U+6C,U+6D,U+6E,U+6F,U+70,U+71,U+72,U+73,U+74,U+75,U+76,U+77,U+78,U+79,U+7A,U+3001,U+3002,U+3010,U+3011,U+4E0E,U+4E3B,U+4E8E,U+4EFD,U+4F5C,U+505C,U+5165,U+5168,U+5173,U+51B3,U+51C6,U+51FA,U+5236,U+52A0,U+52A8,U+52A9,U+5341,U+5355,U+5361,U+53D6,U+5408,U+540D,U+5468,U+56DE,U+56FD,U+5730,U+58F0,U+5907,U+590D,U+59CB,U+5B58,U+5B9A,U+5BF9,U+5BFC,U+5C06,U+5E2E,U+5E74,U+5F00,U+5F0F,U+620F,U+6218,U+62E9,U+6311,U+64CD,U+6597,U+65AD,U+65B0,U+65E0,U+663E,U+6682,U+673A,U+6740,U+675F,U+6863,U+6A21,U+6B66,U+6D88,U+6E38,U+7248,U+724C,U+786E,U+793A,U+7ED3,U+7EE7,U+7EED,U+7F6E,U+8054,U+81EA,U+8BBE,U+8BCA,U+8EAB,U+8F7D,U+8FD4,U+9009,U+91CD,U+91CF,U+95ED,U+97F3,U+9879,U+FF01,U+FF08,U+FF09,U+FF0C,U+FF1A,U+FF1B,U+FF1F;}`, fontSheet.cssRules.length);
+		}
 		if (suitsFont) {
 			fontSheet.insertRule(`@font-face {font-family: 'Suits'; src: url('${lib.assetURL}font/suits.woff2');}`, 0);
 		}
@@ -230,9 +239,7 @@ export async function boot() {
 	lib.version = gamePackage.version;
 
 	// 虽然但是，我就暴露个import，应该没啥问题
-	window.game = {
-		import: game.import.bind(null),
-	};
+	Reflect.set(window, "game", { import: game.import.bind(null) });
 
 	// if (config.get("layout") == "default") {
 	// 	config.set("layout", "mobile");
@@ -299,14 +306,14 @@ export async function boot() {
 	for (const path of startupImages) {
 		toLoad.push({ label: `界面素材:${path}`, load: () => preloadImage(lib.assetURL + path), optional: true });
 	}
-	for (const font of ["xinwei", "huangcao", "NonameSuits"]) {
+	for (const font of ["NonameSuits"]) {
 		toLoad.push({ label: `界面字体:${font}`, load: () => preloadFont(font), optional: true });
 	}
 
 	// 有任务完成就刷新超时计时，避免慢设备在正常预加载时被反复要求重启。
 	const refreshLoadTimeout = () => {
 		clearTimeout(resetGameTimeout);
-		resetGameTimeout = setTimeout(lib.init.reset, Math.max(configLoadTime, 30000));
+		resetGameTimeout = setTimeout(lib.init.reset, Math.max(configLoadTime || 0, 90000));
 		window.resetGameTimeout = resetGameTimeout;
 	};
 	refreshLoadTimeout();
@@ -448,7 +455,7 @@ export async function boot() {
 
 		let node = ui.create.div("#splash", document.body);
 
-		let { promise, resolve } = Promise.withResolvers();
+		let { promise, resolve } = Promise.withResolvers<string>();
 		await splash.init(node, resolve);
 		hideStartupLoading();
 
@@ -462,7 +469,7 @@ export async function boot() {
 		delete window.inSplash;
 		showStartupLoading("正在准备所选模式");
 		game.saveConfig("mode", result);
-		await importMode(result);
+		await runStartupTasks([{ label: "所选模式", load: () => importMode(result) }], () => refreshLoadTimeout(), 1);
 	}
 	await runStartupTasks(contentTasks, (completed, total, label) => {
 		updateStartupProgress((completed / total) * 90, `正在准备：${label}`);
@@ -485,8 +492,10 @@ export async function boot() {
 	lib.init.start = currentMode.start;
 	lib.init.startBefore = currentMode.startBefore;
 
+	const { installSkillDependencies } = await import("../library/skill-dependencies.js");
+	installSkillDependencies();
 	// 包体注册必须按顺序进行；分批执行避免长时间占用主线程。
-	const registration = [...Object.values(lib.imported.character || {}).map(character => ({ label: "武将数据", load: async () => loadCharacter(character) })), { label: "牌堆", load: async () => loadCardPile() }, ...Object.values(lib.imported.card || {}).map(card => ({ label: "卡牌数据", load: async () => loadCard(card) }))];
+	const registration = [...characterPacks.map(name => lib.imported.character?.[name]).filter((value): value is importCharacterConfig => Boolean(value)).map(character => ({ label: "武将数据", load: async () => loadCharacter(character) })), { label: "牌堆", load: async () => loadCardPile() }, ...cardPacks.map(name => lib.imported.card?.[name]).filter((value): value is importCardConfig => Boolean(value)).map(card => ({ label: "卡牌数据", load: async () => loadCard(card) }))];
 	updateStartupProgress(5, "正在准备对局数据");
 	await runStartupTasks(registration, (completed, total, label) => updateStartupProgress(5 + (completed / total) * 85, `正在准备${label}`), 1);
 

@@ -15,7 +15,7 @@
 		"audit:assets": "node scripts/audit-assets.js",
 		"verify:assets": "node scripts/verify-assets.js",
 		"check:platforms": "tsc -p tsconfig.platforms.json --pretty false",
-		"lint:engineering": "eslint scripts apps/core/scripts apps/core/bootstrap.js apps/electron/build.ts apps/electron/vite.config.ts apps/mobile/scripts packages/*/build.ts"
+		"lint:engineering": "eslint scripts apps/core/scripts apps/core/bootstrap.js apps/core/recovery.js apps/electron/build.ts apps/electron/vite.config.ts apps/mobile/scripts packages/*/build.ts"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.2",
@@ -38,5 +38,6 @@
 	"engines": {
 		"node": ">=24 <25",
 		"pnpm": ">=10 <12"
-	}
+	},
+	"packageManager": "pnpm@11.25.0"
 }

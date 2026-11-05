@@ -3461,6 +3461,7 @@ const skills = {
 			let list = game.filterPlayer(current => current != player && get.attitude(player, current) > 3);
 			const num = player.countCards("he", card => get.value(card) < 7);
 			let count = null,
+				selected,
 				from,
 				nh;
 			if (list.length == 0) {
@@ -3481,6 +3482,7 @@ const skills = {
 				const nh2 = list[i].countCards("h");
 				if (nh2 - nh <= num) {
 					count = nh2 - nh;
+					selected = list[i];
 					break;
 				}
 			}
@@ -3490,7 +3492,7 @@ const skills = {
 			if (type == 3) {
 				return count;
 			}
-			return list[i];
+			return selected;
 		},
 		check(card) {
 			const count = lib.skill.redimeng.find(3);

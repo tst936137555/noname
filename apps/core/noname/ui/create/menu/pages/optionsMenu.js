@@ -15,9 +15,6 @@ export const optionsMenu = function (connectMenu) {
 	for (const section of createSettingsPages(lib.configMenu)) {
 		const page = ui.create.div(".settings-section");
 		ui.create.div(".settings-heading", section.name, page);
-		if (section.name === "对局设置") {
-			ui.create.div(".settings-note", "界面、字体与卡牌样式统一采用十周年风格。", page);
-		}
 		const selectSection = function () {
 			if (active === this) return;
 			active?.classList.remove("active");
@@ -68,7 +65,6 @@ export const optionsMenu = function (connectMenu) {
 			}
 		}
 		if (section.name === "存档管理") {
-			ui.create.div(".settings-note", "导出备份设置和游戏存档；录像、自定义图片与音频需单独保留。恢复快照仅保存在本机。", page);
 			const restore = document.createElement("button");
 			restore.textContent = "恢复上次导入前的存档";
 			restore.onclick = async () => {

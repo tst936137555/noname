@@ -2594,7 +2594,9 @@ export class Create {
 
 		ui.arena.appendChild(ui.canvas);
 		ui.canvas.id = "canvas";
-		ui.ctx = ui.canvas.getContext("2d");
+		const context = ui.canvas.getContext("2d");
+		if (!context) throw new Error("无法初始化 Canvas 渲染");
+		ui.ctx = context;
 
 		ui.sidebar.ontouchstart = ui.click.touchStart;
 		ui.sidebar.ontouchmove = ui.click.touchScroll;

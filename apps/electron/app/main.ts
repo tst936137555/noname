@@ -6,6 +6,8 @@ import fs from "fs";
 import path from "path";
 import createApp from "@noname/fs";
 const dirname = path.join(import.meta.dirname, "../");
+const smokeProfile = process.env.NONAME_DESKTOP_SMOKE_PROFILE;
+if (smokeProfile) app.setPath("userData", path.resolve(smokeProfile));
 // 获取单实例锁
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -80,6 +82,7 @@ function createWindow() {
 
 function createMainWindow() {
 	let win = new BrowserWindow({
+		show: !smokeProfile,
 		width: 1000,
 		height: 800,
 		title: "无名杀",
@@ -177,6 +180,7 @@ function createMainWindow() {
 		},
 	];
 	Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
+	if (smokeProfile) void verifyPortableStartup(win);
 	return win;
 }
 
@@ -184,8 +188,10 @@ app.whenReady()
 	.then(async () => {
 		if (!import.meta.env.DEV) {
 			const server = createApp({ dirname, server: true, listen: false });
-			await server.listen({ port: 8089, host: "localhost" });
-			gameAddress = "http://localhost:8089";
+			if (smokeProfile) server.get("/index.html", async (_request, reply) => reply.type("text/html").send(fs.readFileSync(path.join(dirname, "index.html"), "utf8").replace("<head>", '<head><script src="/__desktop-smoke.js"></script>')));
+			if (smokeProfile) server.get("/__desktop-smoke.js", async (_request, reply) => reply.type("application/javascript").send('localStorage.setItem("gplv3_noname_alerted","true");window.confirm=()=>false;window.alert=()=>{};'));
+			const address = await server.listen({ port: smokeProfile ? 0 : 8089, host: "localhost" });
+			gameAddress = smokeProfile ? address : "http://localhost:8089";
 			app.on("before-quit", () => {
 				void server.close();
 			});
@@ -229,7 +235,8 @@ app.whenReady()
 		});
 	})
 	.catch(error => {
-		dialog.showErrorBox("启动失败", String(error));
+		if (smokeProfile) fs.writeFileSync(path.join(smokeProfile, "smoke-result.json"), JSON.stringify({ error: String(error) }));
+		else dialog.showErrorBox("启动失败", String(error));
 		app.quit();
 	});
 
@@ -238,3 +245,22 @@ app.on("window-all-closed", () => {
 		app.quit();
 	}
 });
+
+async function verifyPortableStartup(win: BrowserWindow) {
+	try {
+		for (let attempt = 0; attempt < 120; attempt++) {
+			await new Promise(resolve => setTimeout(resolve, 500));
+			const ready = await win.webContents.executeJavaScript('!!document.querySelector("#splash .splashtext")').catch(() => false);
+			if (!ready) continue;
+			const result = await win.webContents.executeJavaScript('(async()=>{const {lib}=await import("/noname.js");return {version:lib.version,isolated:typeof window.require==="undefined",preload:typeof window.nonameDesktop?.exit==="function",startupError:document.querySelector("#startup-loading")?.dataset.error||null}})()');
+			if (!result.isolated || !result.preload || result.startupError) throw new Error(JSON.stringify(result));
+			fs.writeFileSync(path.join(smokeProfile!, "smoke-result.json"), JSON.stringify(result));
+			app.exit(0);
+			return;
+		}
+		throw new Error("Portable startup timed out");
+	} catch (error) {
+		fs.writeFileSync(path.join(smokeProfile!, "smoke-result.json"), JSON.stringify({ error: String(error) }));
+		app.exit(1);
+	}
+}

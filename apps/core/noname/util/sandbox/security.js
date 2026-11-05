@@ -425,6 +425,14 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 		localStorage.clear,
 		localStorage.key,
 		window.require,
+		document.write,
+		document.writeln,
+		document.open,
+		lib.init.js,
+		lib.init.jsSync,
+		lib.init.promises.js,
+		window.DOMParser?.prototype.parseFromString,
+		window.Range?.prototype.createContextualFragment,
 		// @ts-expect-error There's
 		window.define,
 	];
@@ -439,6 +447,26 @@ async function initSecurity({ lib, game, ui, get, ai, _status }) {
 	[...new Set(accessDenieds.filter(Boolean))].forEach(o => {
 		Marshal.setRule(o, callRule);
 	});
+
+	// Remote UI callbacks may create passive elements, never new execution realms.
+	new Monitor().action(AccessAction.CALL)
+		.require("target", document.createElement, document.createElementNS)
+		.then((_access, named) => {
+			const name = String(named.arguments?.[named.target === document.createElementNS ? 1 : 0]).toLowerCase();
+			if (["script", "iframe", "frame", "object", "embed", "base", "link", "meta"].includes(name)) throw new Error("Remote active DOM denied");
+		}).start();
+	new Monitor().action(AccessAction.WRITE).action(AccessAction.DEFINE)
+		.require("property", "innerHTML", "outerHTML", "srcdoc")
+		.then((_access, named) => {
+			const value = String(named.value ?? named.descriptor?.value ?? "");
+			if (named.property === "srcdoc" || /<(?:script|iframe|frame|object|embed|base|link|meta)\b|\bon\w+\s*=|javascript\s*:/i.test(value)) throw new Error("Remote active markup denied");
+		}).start();
+	new Monitor().action(AccessAction.CALL).require("target", Element.prototype.insertAdjacentHTML, Element.prototype.setAttribute, Element.prototype.setAttributeNS)
+		.then((_access, named) => {
+			if (named.arguments?.some(value => /<(?:script|iframe|frame|object|embed|base|link|meta)\b|\bon\w+\s*=|javascript\s*:|^on\w+$|^srcdoc$/i.test(String(value)))) throw new Error("Remote active attribute denied");
+		}).start();
+	new Monitor().action(AccessAction.READ).require("property", "contentWindow", "contentDocument", "cookie")
+		.then(() => { throw new Error("Remote document capability denied"); }).start();
 
 	// 构造暴露类型的使用规则
 	// 对于要使用instanceof的类型应该限制沙盒如何使用

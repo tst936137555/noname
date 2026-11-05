@@ -27,6 +27,7 @@ export function updateStartupProgress(value, message) {
 }
 
 export function hideStartupLoading() {
+	if (window.inSplash && !performance.getEntriesByName("noname:splash-ready").length) performance.mark("noname:splash-ready");
 	document.getElementById("startup-loading")?.setAttribute("hidden", "");
 	window.dispatchEvent(new Event("noname:startup-ready"));
 }

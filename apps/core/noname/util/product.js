@@ -163,6 +163,11 @@ export function simplifyConfig(config) {
 	if (!object(config.mode_config.global)) config.mode_config.global = {};
 	if (!object(config.all)) config.all = {};
 	for (const mode of modes) if (!object(config.mode_config[mode])) config.mode_config[mode] = {};
+	if (config.selection_defaults_version !== 1) {
+		config.mode_config.global.free_choose = false;
+		for (const mode of modes) config.mode_config[mode].free_choose = false;
+		config.selection_defaults_version = 1;
+	}
 	Object.assign(config, { ...fixedAppearance, skin: {} });
 	// 首次进入也按需创建菜单，避免一次性生成全部武将和卡牌按钮。
 	config.mode_config.global.menu_loadondemand = true;

@@ -148,9 +148,9 @@ test("send queues, byte budgets and public metadata reject oversized or executab
 test("credential digests survive server recreation without an in-memory account limit", async () => {
 	const dir = await mkdtemp(join(tmpdir(), "noname-credentials-"));
 	try {
-		new Credentials(dir).register("../not-a-path", "digest");
-		assert.equal(new Credentials(dir).get("../not-a-path"), "digest");
-		assert.throws(() => new Credentials(dir).register("../not-a-path", "replacement"));
+		await new Credentials(dir).register("../not-a-path", "digest");
+		assert.equal(await new Credentials(dir).get("../not-a-path"), "digest");
+		await assert.rejects(() => new Credentials(dir).register("../not-a-path", "replacement"));
 	} finally {
 		assert.equal(dirname(resolve(dir)), resolve(tmpdir()));
 		await rm(dir, { recursive: true, force: true });

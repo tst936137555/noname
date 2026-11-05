@@ -6,6 +6,8 @@ const config: CapacitorConfig = {
 	webDir: "../../dist",
 	android: {
 		path: "native/android",
+		// Players explicitly choose local ws:// hosts; remote callbacks remain isolated.
+		allowMixedContent: true,
 	},
 	ios: {
 		path: "native/ios",

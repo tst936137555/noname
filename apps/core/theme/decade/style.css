@@ -281,3 +281,38 @@ html {
 		padding-bottom: env(safe-area-inset-bottom);
 	}
 }
+
+/* Keep the original equipment placement and dimensions; add only a translucent frame. */
+#window #arena .player > .equips > .card {
+ background: linear-gradient(90deg, rgba(19,23,21,.70), rgba(29,31,25,.62)) !important;
+ border-image: none;
+ border-top-color: #ac925b66;
+ box-shadow: inset 0 0 0 1px #ac925b55;
+ text-shadow: 0 1px 2px #000;
+}
+#window #arena .player > .equips > .card.selected {
+ background: linear-gradient(90deg, rgba(56,84,91,.80), rgba(36,60,64,.72)) !important;
+ box-shadow: inset 0 0 0 1px #e0c27f !important;
+}
+.seat-number {display: none;}
+#arena > .player > .seat-number {
+ display: block;
+ position: absolute;
+ top: -12px;
+ left: 50%;
+ width: 24px;
+ height: 22px;
+ transform: translateX(-50%);
+ z-index: 6;
+ border: 1px solid #a58a56;
+ border-radius: 4px;
+ background: rgba(25,28,25,.80);
+ color: #f3dfab;
+ font: 15px/22px "xinwei", "KaiTi", serif;
+ text-align: center;
+ text-shadow: 0 1px 2px #000;
+ pointer-events: none;
+}
+#arena > .player > .seat-number[hidden] {display: none;}
+/* Preserve smooth photographic art. */
+#window .avatar, #window .avatar2, #window .card {image-rendering: auto;}

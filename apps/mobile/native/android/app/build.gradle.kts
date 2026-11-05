@@ -73,7 +73,7 @@ android {
     buildTypes {
         getByName("debug") {
             isDebuggable = true
-            manifestPlaceholders["enableAnalytics"] = "true"
+            manifestPlaceholders["allowGameCleartext"] = "true"
         }
 
         getByName("release") {
@@ -82,7 +82,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            manifestPlaceholders["enableAnalytics"] = "false"
+            manifestPlaceholders["allowGameCleartext"] = "true"
             signingConfig = if (releaseSigningConfigured) {
                 signingConfigs.getByName("release")
             } else {

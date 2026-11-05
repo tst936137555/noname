@@ -49,6 +49,7 @@ export class Player extends HTMLDivElement {
 			name: ui.create.div(".name", player),
 			name2: ui.create.div(".name.name2", player),
 			nameol: ui.create.div(".nameol", player),
+			seatNumber: ui.create.div(".seat-number", player),
 			count: ui.create.div(".count", player).hide(),
 			equips: ui.create.div(".equips", player).hide(),
 			judges: ui.create.div(".judges", player),
@@ -78,6 +79,8 @@ export class Player extends HTMLDivElement {
 		});
 		const config = { childList: true };
 		observer.observe(node.equips, config);
+		new MutationObserver(() => player.updateSeatNumber()).observe(player, { attributes: true, attributeFilter: ["data-position"] });
+		player.updateSeatNumber();
 		node.expansions.style.display = "none";
 		const chainLength = game.layout == "default" ? 64 : 40;
 		for (let repetition = 0; repetition < chainLength; repetition++) {
@@ -327,6 +330,7 @@ export class Player extends HTMLDivElement {
 	 * @type { number }
 	 */
 	seatNum;
+
 	/**
 	 * @type { Player }
 	 */
@@ -2417,6 +2421,7 @@ export class Player extends HTMLDivElement {
 		game.broadcastAll(
 			function (player, num) {
 				player.seatNum = num;
+				for (const current of game.players.concat(game.dead)) current.updateSeatNumber();
 			},
 			this,
 			num
@@ -2431,6 +2436,18 @@ export class Player extends HTMLDivElement {
 			return this.seatNum;
 		}
 		return 0;
+	}
+	updateSeatNumber() {
+		const label = this.node?.seatNumber;
+		if (!label) return;
+		const position = Number(this.dataset.position);
+		const first = Reflect.get(_status, "firstAct") || Reflect.get(game, "zhu");
+		const players = [...(game.players || []), ...(game.dead || [])];
+		const assigned = players.map(player => player.getSeatNum());
+		const settled = assigned.length > 0 && assigned.every(value => value > 0) && new Set(assigned).size === assigned.length;
+		const seat = this.getSeatNum() > 0 && (settled || !players.includes(this)) ? this.getSeatNum() : first && players.includes(first) && players.includes(this) ? get.distance(first, this, "absolute") + 1 : position + 1;
+		label.hidden = !Number.isInteger(seat) || seat < 1;
+		label.textContent = label.hidden ? "" : get.cnNumber(seat, true);
 	}
 	/**
 	 * 是否拥有某一性别

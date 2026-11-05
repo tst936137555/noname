@@ -15233,6 +15233,7 @@ const skills = {
 			const { cards, targets } = event;
 			const card = cards[0];
 			const target = targets[0];
+			const type = get.type(card);
 
 			switch (type) {
 				case "basic":

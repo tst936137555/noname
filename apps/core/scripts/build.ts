@@ -41,6 +41,7 @@ async function main() {
 	 * 本体编译过程需要直接复制的文件
 	 */
 	const staticModules: Target[] = [
+		{ src: "recovery.js", dest: "" },
 		{ src: "node_modules/vue/dist/vue.esm-browser.prod.js", dest: "vendor" },
 		{ src: "node_modules/pinyin-pro/dist/index.mjs", dest: "vendor" },
 		{ src: "node_modules/dedent/dist/dedent.mjs", dest: "vendor" },

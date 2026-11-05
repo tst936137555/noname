@@ -5,8 +5,7 @@ import { loadBuildInfo } from "@/util/meta.js";
 import { failStartupLoading, updateStartupProgress } from "@/init/startup.js";
 import { observeRuntime, recordError } from "@/util/diagnostics.js";
 import "core-js-bundle";
-// 保证打包时存在(importmap)
-import "vue/dist/vue.esm-browser.js";
+
 
 (async () => {
 	try {

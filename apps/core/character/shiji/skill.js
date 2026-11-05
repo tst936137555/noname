@@ -9881,7 +9881,7 @@ const skills = {
 					const { skill } = event.cost_data;
 					target.addTempSkill(skill);
 					target.addMark(skill, 1, false);
-					game.log(target, ["本回合使用【杀】的次数上限+1", "本回合的手牌上限+3"][result.index]);
+					game.log(target, ["本回合使用【杀】的次数上限+1", "本回合的手牌上限+3"][Number(skill.slice(-1))]);
 				},
 			},
 			effect0: {

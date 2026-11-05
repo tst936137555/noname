@@ -1,7 +1,7 @@
 <!doctype html>
 
 <head>
-	<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src 'self' data: blob: http: https:; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'self'" />
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; media-src 'self' data: blob: http: https:; connect-src 'self' ws: wss: http: https:; object-src 'none'; base-uri 'self'" />
 	<meta charset="UTF-8" />
 	<!-- 不自动检查电话号码 -->
 	<meta name="format-detection" content="telephone=no" />
@@ -85,14 +85,8 @@
 			cursor: pointer;
 		}
 	</style>
-	<script
-		type="module"
-		src="./bootstrap.js"
-		onerror="
-			document.querySelector('.startup-status').textContent = '启动文件缺失，请重新下载完整包';
-			document.querySelector('#startup-loading button').hidden = false;
-		"
-	></script>
+	<script src="./recovery.js"></script>
+	<script type="module" src="./bootstrap.js"></script>
 </head>
 <body>
 	<section id="startup-loading" aria-label="游戏加载">
@@ -101,7 +95,7 @@
 			<progress max="100" value="0" aria-label="预加载进度"></progress>
 			<p class="startup-percent">0%</p>
 			<p class="startup-status" role="status">正在加载游戏</p>
-			<button type="button" hidden onclick="window.location.reload()">重新加载</button>
+			<button type="button" hidden id="startup-retry">重新加载</button>
 			<button type="button" hidden id="startup-diagnostics">复制诊断</button>
 		</div>
 	</section>

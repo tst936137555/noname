@@ -140,7 +140,7 @@ test("rejected game events always release their event stack", async () => {
 
 test("database writes resolve at transaction completion and reject transaction abort", async () => {
 	const putDB = method("apps/core/noname/game/index.js", "Game", "putDB");
-	for (const abort of [false, true]) {
+	for (const abort of [false, true, "callback"]) {
 		const request = {};
 		const transaction = { objectStore: () => ({ put: () => request }) };
 		const lib = { db: { transaction: () => transaction }, status: { reload: 0 } };
@@ -152,7 +152,7 @@ test("database writes resolve at transaction completion and reject transaction a
 			},
 		};
 		const instance = vm.runInNewContext(`new class { ${putDB} }`, { lib, game, _status: {}, structuredClone });
-		const result = instance.putDB("config", "key", "value");
+		const result = instance.putDB("config", "key", "value", abort === "callback" ? () => { throw new Error("callback failure"); } : undefined);
 		result.then(
 			() => {
 				settled = true;
@@ -164,12 +164,13 @@ test("database writes resolve at transaction completion and reject transaction a
 		request.onsuccess({ type: "success" });
 		await Promise.resolve();
 		assert.equal(settled, false);
-		if (abort) {
+		if (abort === true) {
 			transaction.onabort({ type: "abort" });
 			await assert.rejects(result);
 		} else {
 			transaction.oncomplete();
-			await result;
+			if (abort === "callback") await assert.rejects(result, /callback failure/);
+			else await result;
 		}
 		assert.equal(cleaned, 1);
 	}

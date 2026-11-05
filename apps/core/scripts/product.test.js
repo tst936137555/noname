@@ -9,6 +9,39 @@ import { fitMenu } from "../noname/ui/create/menu/geometry.js";
 
 const defaults = () => JSON.parse(fs.readFileSync(new URL("../game/config.json", import.meta.url)));
 
+test("各模式首次迁移关闭自由选将，设置中主动开启后保持选择", () => {
+	const config = defaults();
+	config.mode_config.global.free_choose = true;
+	config.mode_config.identity.free_choose = true;
+	simplifyConfig(config);
+	for (const mode of ["global", ...modes]) assert.equal(config.mode_config[mode].free_choose, false, mode);
+	config.mode_config.identity.free_choose = true;
+	simplifyConfig(config);
+	assert.equal(config.mode_config.identity.free_choose, true);
+	assert.equal(defaults().mode_config.global.free_choose, false);
+});
+
+test("位置编号随人数显示中文数字，并跟随换座和联机恢复更新", () => {
+	const source = ts.createSourceFile("player.js", fs.readFileSync(new URL("../noname/library/element/player.js", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
+	const declaration = source.statements.find(node => ts.isClassDeclaration(node) && node.name?.text === "Player");
+	assert.ok(declaration && ts.isClassDeclaration(declaration));
+	const members = declaration.members;
+	const code = members.filter(node => ["seatNum", "getSeatNum", "updateSeatNumber"].includes(node.name?.getText(source) || "")).map(node => node.getText(source)).join("\n");
+	const digits = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+	const Player = vm.runInNewContext(`(class { dataset={};node={seatNumber:{}};${code} })`, { game: {}, _status: {}, get: { cnNumber: value => digits[value] } });
+	for (const count of [2, 3, 4, 6, 8, 10]) {
+		for (let position = 0; position < count; position++) {
+			const player = new Player();
+			player.dataset.position = String(position);
+			player.updateSeatNumber();
+			assert.equal(player.node.seatNumber.textContent, digits[position + 1]);
+			player.seatNum = count - position;
+			player.updateSeatNumber();
+			assert.equal(player.node.seatNumber.textContent, digits[count - position]);
+		}
+	}
+});
+
 function classMember(file, className, memberName) {
 	const source = ts.createSourceFile(file, fs.readFileSync(new URL(file, import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
 	return source.statements

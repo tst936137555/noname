@@ -8,6 +8,7 @@ mkdirSync("output", { recursive: true });
 writeFileSync("output/type-diagnostics.txt", result.stdout);
 const counts = {};
 const fingerprints = {};
+const legacyFingerprints = {};
 const sources = new Map();
 const workspaceRoot = process.cwd().replaceAll("\\", "/");
 for (const line of result.stdout.split("\n")) {
@@ -18,8 +19,14 @@ for (const line of result.stdout.split("\n")) {
 		counts[key] = (counts[key] || 0) + 1;
 		if (!sources.has(file)) sources.set(file, readFileSync(file, "utf8").split(/\r?\n/));
 		const anchor = sources.get(file)[Number(match[2]) - 1]?.trim() || "";
-		const message = match[4].trim().replaceAll("\\", "/").replaceAll(workspaceRoot, "<workspace>");
+		const rawMessage = match[4].trim().replaceAll("\\", "/").replaceAll(workspaceRoot, "<workspace>");
+		// The truncated member count changes whenever a class gains a valid member.
+		// Keep the diagnostic, source anchor and listed members stable in the fingerprint.
+		const message = rawMessage.replace(/\band \d+ more\b/g, "and <more> more");
 		const fingerprint = createHash("sha256").update([file, match[3], message, anchor].join("\n")).digest("hex").slice(0, 32);
+		const legacyMessages = [rawMessage];
+		if (rawMessage !== message) legacyMessages.push(rawMessage.replace(/\band (\d+) more\b/g, (_text, count) => `and ${Number(count) - 1} more`));
+		legacyFingerprints[fingerprint] = legacyMessages.map(value => createHash("sha256").update([file, match[3], value, anchor].join("\n")).digest("hex").slice(0, 32));
 		fingerprints[fingerprint] = (fingerprints[fingerprint] || 0) + 1;
 	}
 }
@@ -36,7 +43,7 @@ if (result.status !== 0 && !Object.keys(counts).length) {
 const fingerprintPath = new URL("./type-fingerprints.json", import.meta.url);
 if (existsSync(fingerprintPath)) {
 	const previous = JSON.parse(readFileSync(fingerprintPath, "utf8"));
-	const added = Object.entries(fingerprints).filter(([key, count]) => count > (previous[key] || 0));
+	const added = Object.entries(fingerprints).filter(([key, count]) => count > (previous[key] || Math.max(0, ...legacyFingerprints[key].map(legacy => previous[legacy] || 0))));
 	if (added.length) {
 		console.error(`New diagnostic fingerprints: ${added.length}; inspect output/type-diagnostics.txt and fix the new diagnostics`);
 		failures += added.length;

@@ -2068,7 +2068,7 @@ interface ChooseButtonConfigData {
 	 * 
 	 * 既player.chooseButton的selectButton
 	 */
-	select?: import("@/library/element/Player/type").BroadSelect;
+	select?: import("@/library/element/Player/type").BroadSelect | (() => import("@/library/element/Player/type").BroadSelect);
 
 	//成功选择操作后的内容：
 	/**

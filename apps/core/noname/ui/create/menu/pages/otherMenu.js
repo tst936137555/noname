@@ -162,9 +162,7 @@ export const otherMenu = function (/** @type { boolean | undefined } */ connectM
 		const version = document.createElement("li");
 		const buildLabel = formatBuildLabel(lib.buildInfo);
 		version.textContent = `游戏版本：${lib.version}${buildLabel ? ` (${buildLabel})` : ""}`;
-		const distribution = document.createElement("li");
-		distribution.textContent = "全量版：游戏代码、图片、字体和音频随完整安装包提供。";
-		ul.append(version, distribution);
+		ul.append(version);
 		const exportDiagnostics = document.createElement("button");
 		exportDiagnostics.textContent = "导出诊断信息";
 		exportDiagnostics.onclick = () => game.export(diagnostics(lib), "noname-diagnostics.json");

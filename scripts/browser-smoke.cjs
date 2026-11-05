@@ -15,7 +15,8 @@ app.whenReady()
 			server.get("/image/*", async (req, reply) => reply.sendFile(req.params["*"], path.resolve("dist/image")));
 			server.get("/audio/*", async (req, reply) => reply.sendFile(req.params["*"], path.resolve("dist/audio")));
 		}
-		server.get("/index.html", async (_req, reply) => reply.type("text/html").send(fs.readFileSync(path.join(buildRoot, "index.html"), "utf8").replace("<head>", "<head><script>window.__smokeErrors=[];window.alert=(message)=>window.__smokeErrors.push(String(message));window.confirm=()=>false;window.addEventListener('error',e=>{if(e.error)window.__smokeErrors.push(String(e.error.stack||e.message))});window.addEventListener('unhandledrejection',e=>window.__smokeErrors.push(String(e.reason?.stack||e.reason)));</script>")));
+		server.get("/__smoke-setup.js", async (_req, reply) => reply.type("application/javascript").send("window.__smokeErrors=[];window.alert=(message)=>window.__smokeErrors.push(String(message));window.confirm=()=>false;window.addEventListener('error',e=>{if(e.error)window.__smokeErrors.push(String(e.error.stack||e.message))});window.addEventListener('unhandledrejection',e=>window.__smokeErrors.push(String(e.reason?.stack||e.reason)));"));
+		server.get("/index.html", async (_req, reply) => reply.type("text/html").send(fs.readFileSync(path.join(buildRoot, "index.html"), "utf8").replace("<head>", '<head><script src="/__smoke-setup.js"></script>')));
 		server.get("/__smoke", async (_req, reply) => reply.type("text/html").send('<script>localStorage.setItem("gplv3_noname_alerted","true");location.replace("/index.html")</script>'));
 		const address = await server.listen({ port: 0, host: "127.0.0.1" });
 		const win = new BrowserWindow({ show: false, width: 1200, height: 800, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, preload: path.resolve("apps/electron/dist/app/preload.cjs"), additionalArguments: [`--noname-data-root=${path.resolve("dist")}`] } });
@@ -59,11 +60,11 @@ app.whenReady()
    db.close();return {atomic:true,export:true,legacyFallback:true};
   })()`);
 			console.log("SMOKE_BOUNDARIES", JSON.stringify(checks));
-			const metrics = await win.webContents.executeJavaScript('({splashReadyMs:Math.round(performance.now()),resourceCount:performance.getEntriesByType("resource").length,scriptCount:performance.getEntriesByType("resource").filter(x=>x.initiatorType==="script").length,resourceBytes:performance.getEntriesByType("resource").reduce((sum,x)=>sum+x.encodedBodySize,0)})');
+			const metrics = await win.webContents.executeJavaScript('({splashReadyMs:Math.round(performance.getEntriesByName("noname:splash-ready")[0]?.startTime || performance.now()),resourceCount:performance.getEntriesByType("resource").length,scriptCount:performance.getEntriesByType("resource").filter(x=>x.initiatorType==="script").length,resourceBytes:performance.getEntriesByType("resource").reduce((sum,x)=>sum+x.encodedBodySize,0)})');
 			fs.mkdirSync("output", { recursive: true });
 			fs.writeFileSync("output/browser-metrics.json", JSON.stringify(metrics, null, 2));
 			console.log("SMOKE_METRICS", JSON.stringify(metrics));
-			if (metrics.scriptCount > 40 || metrics.resourceCount > 100) throw new Error("Startup resource budget exceeded");
+			if (metrics.scriptCount > 40 || metrics.resourceCount > 100 || metrics.resourceBytes > 8 * 1024 * 1024) throw new Error("Startup resource budget exceeded");
 			await win.webContents.executeJavaScript(`(() => { const node=document.querySelector('#splash [link=identity]');node.dispatchEvent(new Event('touchend'));node.click(); })()`);
 			for (let attempt = 0; attempt < 90; attempt++) {
 				await new Promise(resolve => setTimeout(resolve, 1000));
@@ -71,6 +72,7 @@ app.whenReady()
 			}
 			const state = await win.webContents.executeJavaScript('({arena:!!document.querySelector("#arena"),loading:!document.querySelector("#startup-loading").hidden, status:document.querySelector(".startup-status").textContent,splash:document.querySelector("#splash")?.className,inSplash:window.inSplash})');
 			console.log("SMOKE_GAME", JSON.stringify(state));
+			if(await win.webContents.executeJavaScript('(async()=>{const {game,get}=await import("/noname.js");return Boolean(get.config("free_choose"))})()')) throw new Error("Free character choice enabled by default");
 			if (!state.arena || state.loading) throw new Error("Game failed to enter");
 			await win.webContents.executeJavaScript(`(async()=>{
     const {ui,lib,game,get,_status}=await import('/noname.js');
@@ -119,6 +121,31 @@ app.whenReady()
 
   })()`);
 			console.log("SMOKE_INTERACTION_ISOLATION_OK");
+            const clarity = await win.webContents.executeJavaScript(`(async()=>{
+              const {lib,game,ui,get}=await import('/noname.js');
+              const missing=Object.entries(lib.character).flatMap(([name,c])=>(c.skills||c[3]||[]).filter(skill=>!lib.skill[skill]).map(skill=>name+':'+skill));
+              if(missing.length)throw new Error('Missing character skills: '+missing.join(','));
+              for(const body of ["document.createElement('script')","document.createElement('iframe')","document.body.insertAdjacentHTML('beforeend','<iframe></iframe>')","document.querySelector('iframe').contentWindow"]){
+                let blocked=false;try{get.parsedResult('_noname_func:function(){'+body+'}')()}catch{blocked=true}
+                if(!blocked)throw new Error('Remote active DOM was not rejected: '+body);
+              }
+              document.querySelectorAll('.menu, .dialog').forEach(node=>node.style.visibility='hidden');
+              const fixture=ui.create.player(ui.arena);fixture.init(Object.keys(lib.character)[0]);fixture.style.visibility='visible';fixture.style.opacity='1';fixture.node.avatar.show();fixture.node.equips.show();fixture.dataset.position='1';fixture.style.cssText='left:120px!important;top:100px!important';
+              fixture.style.setProperty('z-index','200','important');fixture.style.setProperty('visibility','visible','important');fixture.style.setProperty('opacity','1','important');ui.arena.style.zIndex='10000';fixture.node.avatar.style.setProperty('background-image','linear-gradient(white,#fff7cc)','important');fixture.style.setProperty('animation','none','important');for(const node of fixture.querySelectorAll('*'))node.style.setProperty('animation','none','important');await new Promise(r=>setTimeout(r,700));
+              for(const [name,suit,rank] of [['zhuge','club',1],['bagua','spade',2],['dilu','heart',13],['chitu','diamond',5]])fixture.$equip(game.createCard(name,suit,rank));
+              await new Promise(r=>setTimeout(r,800));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+              const equips=fixture.node.equips;
+              if(Math.abs(new DOMMatrix(getComputedStyle(equips).transform).a-.8)>.001)throw new Error('Original equipment scale changed');
+              fixture.seatNum=2;fixture.updateSeatNumber();if(fixture.node.seatNumber.textContent!==get.cnNumber(2,true))throw new Error('Position label missing');fixture.seatNum=3;fixture.updateSeatNumber();if(fixture.node.seatNumber.textContent!==get.cnNumber(3,true))throw new Error('Seat label failed to update');
+              const card=equips.firstElementChild;
+              const style=getComputedStyle(card);
+              if(!style.backgroundImage.includes('gradient'))throw new Error('Equipment has no contrast backing');
+              const rect=fixture.getBoundingClientRect();
+              return {fixtureStyle:{display:getComputedStyle(fixture).display,visibility:getComputedStyle(fixture).visibility,opacity:getComputedStyle(fixture).opacity,parent:fixture.parentElement.id,equipmentHeight:equips.getBoundingClientRect().height,cards:[...equips.children].map(c=>({text:c.node?.name2?.textContent,visibility:getComputedStyle(c).visibility,display:getComputedStyle(c).display,opacity:getComputedStyle(c).opacity,top:c.getBoundingClientRect().top}))},missingSkills:missing.length,equipmentScale:getComputedStyle(equips).transform,rect:{x:Math.floor(rect.x)-5,y:Math.floor(rect.y)-5,width:Math.ceil(rect.width)+10,height:Math.ceil(rect.height)+10}};
+            })()`);
+            fs.writeFileSync('output/equipment-clarity.png',(await win.webContents.capturePage()).toPNG());
+            console.log('SMOKE_CONTENT_CLARITY',JSON.stringify(clarity));
+
 			const pageErrors = await win.webContents.executeJavaScript("window.__smokeErrors");
 			if (pageErrors.length) throw new Error("Unexpected browser errors: " + pageErrors.join(" | "));
 			win.webContents.session.webRequest.onBeforeRequest({ urls: [address + "/noname/entry.js*"] }, (_details, callback) => callback({ cancel: true }));
