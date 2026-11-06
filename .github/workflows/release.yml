@@ -343,7 +343,6 @@ jobs:
             - build-ios
         permissions:
             contents: write
-            discussions: write
 
         steps:
             - name: Checkout repository
@@ -356,9 +355,7 @@ jobs:
               run: |
                   TAG="${GITHUB_REF_NAME}"
 
-                  gh release edit "$TAG" \
-                  --draft=false \
-                  --discussion-category "Announcements"
+                  gh release edit "$TAG" --draft=false
 
     cleanup-release:
         name: Clean Draft When Failure

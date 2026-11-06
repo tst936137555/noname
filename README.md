@@ -54,6 +54,29 @@ pnpm -F noname... build
 
 游戏内保留武将包、卡牌包管理及存档导入／导出，移除扩展安装／加载、在线升级、更新源设置、素材包导入和游戏文件管理。“其它 → 关于”只显示游戏版本及全量版说明。
 
+## CI 自动构建与发行
+
+提交到 `main`、向 `main` 发起 Pull Request，或手动运行 `CI`，会执行检查、全量构建、资源校验、浏览器回归和 Windows／Android／iOS 构建验证。普通 CI 和 Nightly 不会创建 GitHub Release。
+
+正式发行使用 [Release 工作流](.github/workflows/release.yml)，由推送 `v版本号` 标签触发。仅修改版本号或推送 `main` 不会正式发行。以 `1.11.8` 为例，先修改 `apps/core/package.json` 的 `version` 并更新 `apps/core/game/updateLog.md` 中的发行说明，将待发行变更提交后执行：
+
+```bash
+git push origin main
+git tag v1.11.8
+git push origin v1.11.8
+```
+
+标签必须指向包含对应版本号的提交。工作流先完成全部验证，再创建草稿、上传各平台产物；全部成功后才公开发行，最高数字版本标签对应的发行标记为 Latest。任一平台失败均不会公开草稿，并会清理该草稿；标签保留。
+
+仓库需启用 GitHub Actions，并允许工作流使用 `GITHUB_TOKEN` 写入仓库内容以创建 Release。Android 正式构建还必须在仓库的 **Settings → Secrets and variables → Actions** 中配置以下 Secrets（签名文件本身不要提交到仓库）：
+
+- `ANDROID_KEYSTORE_BASE64`：发布签名 keystore 文件的 Base64 内容。
+- `ANDROID_KEYSTORE_PASSWORD`：keystore 密码。
+- `ANDROID_KEY_ALIAS`：签名密钥别名。
+- `ANDROID_KEY_PASSWORD`：签名密钥密码。
+
+成功后可在仓库的 **Releases** 下载全量包 `noname.full.zip`、Windows 便携包 `noname.windows.版本号.zip`、签名 Android 包 `noname.android.apk` 及各自的 SHA-256 校验文件。另提供 `noname.ios.experimental.ipa` 及校验文件；此 iOS 包未签名，安装前需要另行签名，不能直接作为 App Store 发行包。
+
 ## 多线程构建
 
 workspace 依赖按顺序完成构建，避免共享类型声明在清理时产生冲突。核心先完成本体构建和静态复制，再使用 Node.js `worker_threads` 并行构建武将、模式和卡牌三个包体类别。各线程分别写入 `dist/character`、`dist/mode`、`dist/card`，全部成功后才写入构建信息并进入发布包合并阶段。
